@@ -330,7 +330,7 @@ echo "# Deaktivierung von IPv6" | sudo tee -a /etc/sysctl.conf > /dev/null && ec
 # Postfix auf IPv4 beschränken
 sudo bash -c 'echo "# Nur IPv4-Protokoll aktivieren" >> /etc/postfix/main.cf && echo "inet_protocols = ipv4" >> /etc/postfix/main.cf'
 
-sudo bash -c 'echo "# Forwarding deaktivieren" >> /etc/sysctl.conf
+sudo bash -c 'echo "# Forwarding deaktivieren" >> /etc/sysctl.conf'
 echo "net.ipv4.ip_forward = 0" >> /etc/sysctl.conf
 echo "net.ipv6.conf.all.forwarding = 0" >> /etc/sysctl.conf
 
