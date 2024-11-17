@@ -415,17 +415,38 @@ sudo sed -i 's/^IPV6=yes/IPV6=no/' /etc/default/ufw
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 
-# SSH zulassen für 10.0.0.0/24
-sudo ufw allow from 10.0.0.0/24 to 10.0.0.0/24 port 62253 proto tcp comment 'SSH zulassen für 10.0.0.0/24'
+# SSH für 10.0.0.0/24 erlauben
+sudo ufw allow from 10.0.0.0/24 to any port 62253 proto tcp comment 'SSH zulassen für 10.0.0.0/24'
 
-# Proxmox Web-UI zulassen für 10.0.0.0/24
-sudo ufw allow from 10.0.0.0/24 to 10.0.0.0/24 port 8006 proto tcp comment 'Proxmox Web-UI zulassen für 10.0.0.0/24'
+# Proxmox Web-UI für 10.0.0.0/24 erlauben
+sudo ufw allow from 10.0.0.0/24 to any port 8006 proto tcp comment 'Proxmox Web-UI zulassen für 10.0.0.0/24'
 
-# VNC Web-Console zulassen für 10.0.0.0/24
-sudo ufw allow from 10.0.0.0/24 to 10.0.0.0/24 port 5900:5999 proto tcp comment 'VNC Web-Console zulassen für 10.0.0.0/24'
+# VNC Web-Console für 10.0.0.0/24 erlauben
+sudo ufw allow from 10.0.0.0/24 to any port 5900:5999 proto tcp comment 'VNC Web-Console zulassen für 10.0.0.0/24'
 
-# SPICE Proxy zulassen für 10.0.0.0/24
-sudo ufw allow from 10.0.0.0/24 to 10.0.0.0/24 port 3128 proto tcp comment 'SPICE Proxy zulassen für 10.0.0.0/24'
+# SPICE Proxy für 10.0.0.0/24 erlauben
+sudo ufw allow from 10.0.0.0/24 to any port 3128 proto tcp comment 'SPICE Proxy zulassen für 10.0.0.0/24'
+
+# DNS-Abfragen (TCP) von 10.0.0.0/24 zu 1.1.1.1 erlauben
+sudo ufw allow from 10.0.0.0/24 to 1.1.1.1 port 53 proto tcp comment 'Erlaube TCP-DNS-Abfragen von 10.0.0.0/24 zu 1.1.1.1'
+
+# DNS-Abfragen (UDP) von 10.0.0.0/24 zu 1.1.1.1 erlauben
+sudo ufw allow from 10.0.0.0/24 to 1.1.1.1 port 53 proto udp comment 'Erlaube DNS-Abfragen von 10.0.0.0/24 zu 1.1.1.1'
+
+# DNS über TLS von 10.0.0.0/24 zu 1.1.1.1 erlauben
+sudo ufw allow from 10.0.0.0/24 to 1.1.1.1 port 853 proto tcp comment 'Erlaube DNS-Anfragen über TLS von 10.0.0.0/24 zu 1.1.1.1'
+
+# Proxmox Web-UI für 10.0.20.0/24 über eth0 erlauben
+sudo ufw allow in on eth0 from 10.0.20.0/24 to any port 8006 proto tcp comment 'Proxmox Web-UI zulassen für 10.0.20.0/24'
+
+# SSH für 10.0.20.0/24 erlauben
+sudo ufw allow from 10.0.20.0/24 to any port 62253 proto tcp comment 'SSH zulassen für 10.0.20.0/24'
+
+# Proxmox Web-UI für 10.0.20.0/24 erlauben
+sudo ufw allow from 10.0.20.0/24 to any port 8006 proto tcp comment 'Proxmox Web-UI zulassen für 10.0.20.0/24'
+
+# VNC Web-Console für 10.0.20.0/24 erlauben
+sudo ufw allow from 10.0.20.0/24 to any port 5900:5999 proto tcp comment 'VNC Web-Console zulassen für 10.0.20.0/24'
 
 # UFW-Regeln überprüfen
 sudo ufw status verbose
