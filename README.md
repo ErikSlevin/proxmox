@@ -115,8 +115,7 @@ awk '$5 >= 3071' /etc/ssh/moduli > /etc/ssh/moduli.safe
 mv /etc/ssh/moduli.safe /etc/ssh/moduli
 
 # Restrict supported key exchange, cipher, and MAC algorithms
-echo -e "# Restrict key exchange, cipher, and MAC algorithms, as per sshaudit.com\n# hardening guide.\n KexAlgorithms 
-curve25519-sha256,curve25519-sha256@libssh.org,gss-curve25519-sha256-,diffie-hellman-group16-sha512,gss-group16-sha512-,diffie-hellman-group18-sha512,diffie-hellman-group-exchange-sha256\n\nCiphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr\n\nMACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,umac-128-etm@openssh.com\n\nHostKeyAlgorithms sk-ssh-ed25519-cert-v01@openssh.com,ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256\n\nRequiredRSASize 3072\n\nCASignatureAlgorithms sk-ssh-ed25519@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256\n\nGSSAPIKexAlgorithms gss-curve25519-sha256-,gss-group16-sha512-\n\nHostbasedAcceptedAlgorithms sk-ssh-ed25519-cert-v01@openssh.com,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,ssh-ed25519,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-512,rsa-sha2-256-cert-v01@openssh.com,rsa-sha2-256\n\nPubkeyAcceptedAlgorithms sk-ssh-ed25519-cert-v01@openssh.com,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,ssh-ed25519,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-512,rsa-sha2-256-cert-v01@openssh.com,rsa-sha2-256\n\n" > /etc/ssh/sshd_config.d/ssh-audit_hardening.conf
+echo -e "# Restrict key exchange, cipher, and MAC algorithms, as per sshaudit.com\n# hardening guide.\n KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,gss-curve25519-sha256-,diffie-hellman-group16-sha512,gss-group16-sha512-,diffie-hellman-group18-sha512,diffie-hellman-group-exchange-sha256\n\nCiphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr\n\nMACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,umac-128-etm@openssh.com\n\nHostKeyAlgorithms sk-ssh-ed25519-cert-v01@openssh.com,ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256\n\nRequiredRSASize 3072\n\nCASignatureAlgorithms sk-ssh-ed25519@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256\n\nGSSAPIKexAlgorithms gss-curve25519-sha256-,gss-group16-sha512-\n\nHostbasedAcceptedAlgorithms sk-ssh-ed25519-cert-v01@openssh.com,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,ssh-ed25519,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-512,rsa-sha2-256-cert-v01@openssh.com,rsa-sha2-256\n\nPubkeyAcceptedAlgorithms sk-ssh-ed25519-cert-v01@openssh.com,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,ssh-ed25519,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-512,rsa-sha2-256-cert-v01@openssh.com,rsa-sha2-256\n\n" > /etc/ssh/sshd_config.d/ssh-audit_hardening.conf
 
 # Generiert einen sicheren SSH-Key (ed25519) - mit y Bestätigen.
 ssh-keygen -o -a 100 -t ed25519 -N "" -f /etc/ssh/ssh_host_ed25519_key -C "$(hostname)-$(date -I)"
@@ -331,7 +330,7 @@ echo "# Deaktivierung von IPv6" | sudo tee -a /etc/sysctl.conf > /dev/null && ec
 # Postfix auf IPv4 beschränken
 sudo bash -c 'echo "# Nur IPv4-Protokoll aktivieren" >> /etc/postfix/main.cf && echo "inet_protocols = ipv4" >> /etc/postfix/main.cf'
 
-sudo bash -c 'echo "# Forwarding deaktivieren" >> /etc/sysctl.conf
+sudo bash -c 'echo "# Forwarding deaktivieren" >> /etc/sysctl.conf'
 echo "net.ipv4.ip_forward = 0" >> /etc/sysctl.conf
 echo "net.ipv6.conf.all.forwarding = 0" >> /etc/sysctl.conf
 
@@ -416,17 +415,38 @@ sudo sed -i 's/^IPV6=yes/IPV6=no/' /etc/default/ufw
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 
-# SSH zulassen für 10.0.0.0/24
-sudo ufw allow from 10.0.0.0/24 to 10.0.0.0/24 port 62253 proto tcp comment 'SSH zulassen für 10.0.0.0/24'
+# SSH für 10.0.0.0/24 erlauben
+sudo ufw allow from 10.0.0.0/24 to any port 62253 proto tcp comment 'SSH zulassen für 10.0.0.0/24'
 
-# Proxmox Web-UI zulassen für 10.0.0.0/24
-sudo ufw allow from 10.0.0.0/24 to 10.0.0.0/24 port 8006 proto tcp comment 'Proxmox Web-UI zulassen für 10.0.0.0/24'
+# Proxmox Web-UI für 10.0.0.0/24 erlauben
+sudo ufw allow from 10.0.0.0/24 to any port 8006 proto tcp comment 'Proxmox Web-UI zulassen für 10.0.0.0/24'
 
-# VNC Web-Console zulassen für 10.0.0.0/24
-sudo ufw allow from 10.0.0.0/24 to 10.0.0.0/24 port 5900:5999 proto tcp comment 'VNC Web-Console zulassen für 10.0.0.0/24'
+# VNC Web-Console für 10.0.0.0/24 erlauben
+sudo ufw allow from 10.0.0.0/24 to any port 5900:5999 proto tcp comment 'VNC Web-Console zulassen für 10.0.0.0/24'
 
-# SPICE Proxy zulassen für 10.0.0.0/24
-sudo ufw allow from 10.0.0.0/24 to 10.0.0.0/24 port 3128 proto tcp comment 'SPICE Proxy zulassen für 10.0.0.0/24'
+# SPICE Proxy für 10.0.0.0/24 erlauben
+sudo ufw allow from 10.0.0.0/24 to any port 3128 proto tcp comment 'SPICE Proxy zulassen für 10.0.0.0/24'
+
+# DNS-Abfragen (TCP) von 10.0.0.0/24 zu 1.1.1.1 erlauben
+sudo ufw allow from 10.0.0.0/24 to 1.1.1.1 port 53 proto tcp comment 'Erlaube TCP-DNS-Abfragen von 10.0.0.0/24 zu 1.1.1.1'
+
+# DNS-Abfragen (UDP) von 10.0.0.0/24 zu 1.1.1.1 erlauben
+sudo ufw allow from 10.0.0.0/24 to 1.1.1.1 port 53 proto udp comment 'Erlaube DNS-Abfragen von 10.0.0.0/24 zu 1.1.1.1'
+
+# DNS über TLS von 10.0.0.0/24 zu 1.1.1.1 erlauben
+sudo ufw allow from 10.0.0.0/24 to 1.1.1.1 port 853 proto tcp comment 'Erlaube DNS-Anfragen über TLS von 10.0.0.0/24 zu 1.1.1.1'
+
+# Proxmox Web-UI für 10.0.20.0/24 über eth0 erlauben
+sudo ufw allow in on eth0 from 10.0.20.0/24 to any port 8006 proto tcp comment 'Proxmox Web-UI zulassen für 10.0.20.0/24'
+
+# SSH für 10.0.20.0/24 erlauben
+sudo ufw allow from 10.0.20.0/24 to any port 62253 proto tcp comment 'SSH zulassen für 10.0.20.0/24'
+
+# Proxmox Web-UI für 10.0.20.0/24 erlauben
+sudo ufw allow from 10.0.20.0/24 to any port 8006 proto tcp comment 'Proxmox Web-UI zulassen für 10.0.20.0/24'
+
+# VNC Web-Console für 10.0.20.0/24 erlauben
+sudo ufw allow from 10.0.20.0/24 to any port 5900:5999 proto tcp comment 'VNC Web-Console zulassen für 10.0.20.0/24'
 
 # UFW-Regeln überprüfen
 sudo ufw status verbose
