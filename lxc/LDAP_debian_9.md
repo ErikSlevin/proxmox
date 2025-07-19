@@ -1,3 +1,8 @@
+
+
+
+
+
 # LDAP Server Installation in Proxmox LXC Container - Teil 1
 **Server:** openldap.home.intern (10.0.0.110)
 
@@ -9,6 +14,15 @@ Diese Anleitung beschreibt die schrittweise Installation und Konfiguration eines
 - Administratorzugang zur Proxmox Web-UI
 - SSH-Zugang zum Proxmox Host
 - Grundlegende Linux-Kenntnisse
+
+## Vorbereitungen
+
+### 0.1 SSH-Schlüsselpaar erstellen
+1. **PuTTYgen starten** (`puttygen.exe`)
+2. **Schlüssel-Typ wählen:** `Ed25519` (modernster, sicherster Typ)
+3. **"Generate" klicken**
+4. **Maus wild bewegen** für Zufallszahlen
+5. **Warten bis Schlüssel generiert ist**
 
 ## 1. LXC Container erstellen
 
@@ -126,10 +140,12 @@ alias ldap-logs='journalctl -u slapd -f'
 alias ldap-search='ldapsearch -x -H ldap://localhost -b dc=home,dc=intern'
 
 # System-Info beim Login anzeigen (in grün)
-echo -e "\033[32m🔧 OpenLDAP Server - $(hostname) (10.0.0.110)\033[0m"
-echo -e "\033[32m📍 IP: $(hostname -I | awk '{print $1}')\033[0m"
-echo -e "\033[32m⏰ Uptime: $(uptime -p)\033[0m"
-echo -e "\033[32m🌐 Domain: home.intern\033[0m"
+echo ""
+echo -e "\033[32m   OpenLDAP Server - $(hostname) (10.0.0.110)\033[0m"
+echo -e "\033[32m   IP: $(hostname -I | awk '{print $1}')\033[0m"
+echo -e "\033[32m   Uptime: $(uptime -p)\033[0m"
+echo -e "\033[32m   Domain: home.intern\033[0m"
+echo ""
 EOF
 
 # Bashrc neu laden
@@ -171,6 +187,29 @@ pct exec $CONTAINER_ID -- chmod 600 /home/erik/.ssh/authorized_keys
 pct enter $CONTAINER_ID
 
 echo "✅ User erik erstellt mit SSH-Key-Zugang!"
+```
+
+### 2.3 SSH-Key für Erik konfigurieren
+```bash
+# Container verlassen um SSH-Key zu kopieren
+exit
+
+# SSH-Key von Proxmox Root zu Erik im Container kopieren
+CONTAINER_ID=$(pct list | grep openldap | awk '{print $1}')
+cat ~/.ssh/authorized_keys | pct exec $CONTAINER_ID -- tee -a /home/erik/.ssh/authorized_keys
+
+# Berechtigungen im Container korrigieren
+pct exec $CONTAINER_ID -- chown erik:erik /home/erik/.ssh/authorized_keys
+pct exec $CONTAINER_ID -- chmod 600 /home/erik/.ssh/authorized_keys
+
+# Zurück in den Container
+pct enter $CONTAINER_ID
+
+echo "✅ SSH-Key für Erik konfiguriert!"
+
+# SSH-Key testen (anzeigen)
+echo "SSH-Key für Erik:"
+cat /home/erik/.ssh/authorized_keys
 ```
 
 ### 2.3 SSH-Härtung (Ultra-Sicher)
