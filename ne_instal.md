@@ -290,17 +290,6 @@ pveum passwd erik@pam
 pveum acl modify / -user erik@pam -role Administrator
 ```
 
-### 3. GUI-Benutzer einrichten (Alternative)
-
-1. **Datacenter → Berechtigungen → Benutzer**
-2. **Hinzufügen**
-3. **Benutzer-ID**: `erik@pam`
-4. **Bestätigen**
-5. **Datacenter → Berechtigungen → Hinzufügen → Benutzer-Berechtigung**
-6. **Pfad**: `/` (Root)
-7. **Benutzer**: `erik@pam`
-8. **Rolle**: `Administrator`
-
 ## SSH-Zugang einrichten
 
 ### SSH-Keys generieren (Windows)
