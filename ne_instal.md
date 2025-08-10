@@ -1,3 +1,10 @@
+### Intel e1000e NIC Offloading Fix
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/nic-offloading-fix.sh)"
+
+### Proxmox VE Post Install
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/post-pve-install.sh)"
+
+###
 # Proxmox VE Setup Guide
 
 ## Inhaltsverzeichnis
