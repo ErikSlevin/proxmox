@@ -267,7 +267,7 @@ Bei VM-Erstellung oder -Bearbeitung:
 ```bash
 # Neuen Linux-Benutzer mit Home-Verzeichnis anlegen
 # -m erstellt automatisch ein Home-Verzeichnis (/home/erik)
-useradd -m erik
+useradd -m -d /home/erik -s /bin/bash erik
 
 # Passwort für den Linux-Benutzer setzen
 passwd erik
