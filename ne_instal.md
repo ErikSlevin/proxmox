@@ -9,8 +9,12 @@
 5. [Proxmox Netzwerk-Konfiguration über GUI](#proxmox-netzwerk-konfiguration-über-gui)
 6. [Admin-Benutzer einrichten](#admin-benutzer-einrichten)
 7. [SSH-Zugang einrichten](#ssh-zugang-einrichten)
-8. [Wichtige Hinweise](#wichtige-hinweise)
-9. [Troubleshooting](#troubleshooting)
+8. [SSH-Sicherheit Hardening](#ssh-sicherheit-hardening)
+9. [Firewall-Konfiguration](#firewall-konfiguration)
+10. [Fail2Ban Setup](#fail2ban-setup)
+11. [SSH-Sicherheitsaudit](#ssh-sicherheitsaudit)
+12. [Wichtige Hinweise](#wichtige-hinweise)
+13. [Troubleshooting](#troubleshooting)
 
 ## Überblick
 Diese Anleitung beschreibt die Einrichtung von Proxmox VE mit einem Admin-Benutzer und VLAN-fähiger Netzwerkkonfiguration.
@@ -18,52 +22,6 @@ Diese Anleitung beschreibt die Einrichtung von Proxmox VE mit einem Admin-Benutz
 ## Netzwerkkonfiguration (/etc/network/interfaces)
 
 Nach der GUI-Konfiguration wird folgende Konfiguration automatisch generiert:
-
-```bash
-# Hauptnetzwerk-Interface (Management)
-auto vmbr0
-iface vmbr0 inet static
-        address 10.0.0.240/24
-        gateway 10.0.0.1
-        bridge-ports eno1
-        bridge-stp off
-        bridge-fd 0
-
-# Management VLAN (VLAN 10)
-auto MGMT
-iface MGMT inet static
-        address 10.10.0.1/24
-        bridge-ports none
-        bridge-stp off
-        bridge-fd 0
-        bridge-vlan-aware yes
-        bridge-vids 10
-#MGMT VLAN
-
-# Production VLAN (VLAN 20)
-auto PROD
-iface PROD inet static
-        address 10.20.0.1/24
-        bridge-ports none
-        bridge-stp off
-        bridge-fd 0
-        bridge-vlan-aware yes
-        bridge-vids 20
-#PROD VLAN
-
-# DMZ VLAN (VLAN 30)
-auto DMZ
-iface DMZ inet static
-        address 10.30.0.1/24
-        bridge-ports none
-        bridge-stp off
-        bridge-fd 0
-        bridge-vlan-aware yes
-        bridge-vids 30
-#DMZ VLAN
-
-source /etc/network/interfaces.d/
-```
 
 ## Netzwerk-Schema
 
@@ -327,14 +285,385 @@ Host proxmox
 $sshConfig | Out-File -FilePath "$env:USERPROFILE\.ssh\config" -Encoding UTF8
 ```
 
-### SSH-Verbindung testen
+## SSH-Sicherheit Hardening
+
+### 1. Backup der ursprünglichen Konfiguration
 
 ```bash
-# Direkte Verbindung
-ssh erik@10.0.0.240
+# Backup mit Zeitstempel erstellen
+sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.$(date +%Y%m%d_%H%M%S)
 
-# Über SSH-Config
+# Backup-Verzeichnis erstellen
+sudo mkdir -p /etc/ssh/backups
+sudo cp /etc/ssh/sshd_config /etc/ssh/backups/
+
+# Backup prüfen
+ls -la /etc/ssh/backups/
+```
+
+### 2. Gehärtete SSH-Konfiguration erstellen
+
+```bash
+# Sicherheits-Konfiguration erstellen
+sudo tee /etc/ssh/sshd_config.d/99-security-hardening.conf << 'EOF'
+# =============================================================================
+# SSH Sicherheits-Konfiguration - Enterprise Standards 2025
+# =============================================================================
+
+# Netzwerk-Konfiguration
+Port 62222
+AddressFamily inet
+ListenAddress 0.0.0.0
+
+# Protokoll und Verschlüsselung
+Protocol 2
+
+# Host Keys - Nur moderne Algorithmen
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+# Key Exchange Algorithmen
+KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512
+
+# Cipher Algorithmen - Nur AEAD und sichere Verschlüsselung
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+
+# MAC Algorithmen - Nur ETM (Encrypt-then-MAC)
+MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com
+
+# Public Key Algorithmen
+PubkeyAcceptedAlgorithms ssh-ed25519,ssh-rsa,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521
+
+# =============================================================================
+# Authentifizierungs-Konfiguration
+# =============================================================================
+
+# Root-Zugriff komplett deaktiviert
+PermitRootLogin no
+
+# Benutzer-Authentifizierung (ÄNDERN SIE 'erik' ZU IHREM BENUTZERNAMEN)
+AllowUsers erik
+DenyUsers root
+DenyGroups root
+
+# Public Key Authentifizierung - Erforderlich
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+
+# Passwort-Authentifizierung - Deaktiviert
+PasswordAuthentication no
+PermitEmptyPasswords no
+
+# Challenge Response - Deaktiviert
+ChallengeResponseAuthentication no
+KbdInteractiveAuthentication no
+
+# PAM - Deaktiviert für Key-Only Auth
+UsePAM no
+
+# =============================================================================
+# Session-Konfiguration
+# =============================================================================
+
+# Verbindungslimits
+MaxAuthTries 3
+MaxSessions 5
+MaxStartups 3:30:10
+
+# Session Timeouts
+ClientAliveInterval 300
+ClientAliveCountMax 2
+LoginGraceTime 30
+
+# =============================================================================
+# Feature-Beschränkungen
+# =============================================================================
+
+# X11 Forwarding - Sicherheitsrisiko
+X11Forwarding no
+
+# TCP/Port Forwarding - Kontrolliert
+AllowTcpForwarding local
+AllowStreamLocalForwarding no
+GatewayPorts no
+
+# Agent Forwarding - Sicherheitsrisiko
+AllowAgentForwarding no
+
+# Tunneling
+PermitTunnel no
+
+# User Environment
+PermitUserEnvironment no
+
+# =============================================================================
+# Logging und Monitoring
+# =============================================================================
+
+# Logging
+SyslogFacility AUTHPRIV
+LogLevel VERBOSE
+
+# Banner
+Banner /etc/ssh/ssh_banner.txt
+
+# =============================================================================
+# Moderne Sicherheitsfeatures
+# =============================================================================
+
+# Strict Modes
+StrictModes yes
+
+# Kompression - Sicherheitsrisiko
+Compression no
+
+# TCP Keep Alive
+TCPKeepAlive yes
+
+# DNS
+UseDNS no
+
+# MOTD
+PrintMotd no
+PrintLastLog yes
+
+# Subsystem
+Subsystem sftp /usr/lib/openssh/sftp-server -f AUTHPRIV -l INFO
+
+# =============================================================================
+# Zusätzliche Sicherheit
+# =============================================================================
+
+# Ungenutzte Authentifizierungsmethoden deaktivieren
+GSSAPIAuthentication no
+HostbasedAuthentication no
+IgnoreUserKnownHosts yes
+
+# Nur moderne Verschlüsselung
+RequiredRSASize 2048
+
+# Schwache Konfigurationen verhindern
+DebianBanner no
+EOF
+```
+
+### 3. Sicherheits-Banner erstellen
+
+```bash
+sudo tee /etc/ssh/ssh_banner.txt << 'EOF'
+
+  ################################################################################
+  #                                                                              #
+  #                           NUR AUTORISIERTER ZUGRIFF                          #
+  #                                                                              #
+  #  Dieses System ist nur für autorisierte Benutzer. Alle Aktivitäten           #
+  #  können überwacht und aufgezeichnet werden. Durch den Zugriff auf            #
+  #  dieses System bestätigen Sie, dass Sie keine Privatsphäre erwarten.         #
+  #                                                                              #
+  #  Unbefugter Zugriff ist strengstens untersagt und kann straf- und            #
+  #  zivilrechtliche Konsequenzen haben.                                         #
+  #                                                                              #
+  ################################################################################
+
+EOF
+```
+
+### 4. Host Keys neu generieren
+
+```bash
+# Bestehende Keys sichern
+sudo cp -r /etc/ssh /etc/ssh.backup
+
+# Schwache Keys entfernen
+sudo rm -f /etc/ssh/ssh_host_dsa_key*
+sudo rm -f /etc/ssh/ssh_host_ecdsa_key*
+
+# Neue starke RSA Keys generieren (4096-bit)
+sudo ssh-keygen -t rsa -b 4096 -f /etc/ssh/ssh_host_rsa_key -N ""
+
+# ED25519 Key neu generieren
+sudo rm -f /etc/ssh/ssh_host_ed25519_key*
+sudo ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N ""
+
+# Korrekte Berechtigungen setzen
+sudo chmod 600 /etc/ssh/ssh_host_*_key
+sudo chmod 644 /etc/ssh/ssh_host_*_key.pub
+```
+
+### 5. Konfiguration testen und anwenden
+
+```bash
+# SSH-Konfiguration testen
+sudo sshd -t
+
+# Bei erfolgreichem Test SSH-Service neu laden
+sudo systemctl reload sshd
+
+# SSH-Service Status prüfen
+sudo systemctl status sshd
+
+# Prüfen ob neuer Port lauscht
+sudo ss -tlnp | grep :62222
+```
+
+## Firewall-Konfiguration
+
+### UFW Firewall einrichten
+
+```bash
+# Standard-Richtlinien setzen
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+# Neuen SSH-Port erlauben
+sudo ufw allow 62222/tcp comment 'SSH Hardened'
+
+# Proxmox Web-Interface erlauben
+sudo ufw allow 8006/tcp comment 'Proxmox WebUI'
+
+# Firewall aktivieren
+sudo ufw --force enable
+
+# Firewall-Status prüfen
+sudo ufw status verbose
+```
+
+### Alten SSH-Port entfernen (Nach dem Test!)
+
+```bash
+# Nur ausführen nach erfolgreicher Verbindung über neuen Port
+sudo ufw delete allow ssh
+sudo ufw delete allow 22/tcp
+```
+
+## Fail2Ban Setup
+
+### Fail2Ban für SSH-Schutz konfigurieren
+
+```bash
+# Fail2Ban installieren
+sudo apt install fail2ban -y
+
+# Fail2Ban-Konfiguration für benutzerdefinierten SSH-Port
+sudo tee /etc/fail2ban/jail.d/sshd-hardened.conf << 'EOF'
+[sshd]
+enabled = true
+port = 62222
+logpath = /var/log/auth.log
+backend = systemd
+maxretry = 3
+findtime = 600
+bantime = 3600
+ignoreip = 127.0.0.1/8 10.0.0.0/8 192.168.0.0/16
+
+[sshd-ddos]
+enabled = true
+port = 62222
+logpath = /var/log/auth.log
+backend = systemd
+maxretry = 6
+findtime = 60
+bantime = 600
+ignoreip = 127.0.0.1/8 10.0.0.0/8 192.168.0.0/16
+EOF
+
+# Fail2Ban neu starten
+sudo systemctl restart fail2ban
+sudo systemctl enable fail2ban
+
+# Fail2Ban-Status prüfen
+sudo fail2ban-client status
+sudo fail2ban-client status sshd
+```
+
+## SSH-Sicherheitsaudit
+
+### SSH-Audit Tool installieren
+
+```bash
+# SSH-Audit von GitHub klonen
+cd /opt
+sudo git clone https://github.com/jtesta/ssh-audit.git
+sudo chown -R $(whoami):$(whoami) ssh-audit
+cd ssh-audit
+```
+
+### Sicherheitsaudit durchführen
+
+```bash
+# Basis-Audit
+python3 ssh-audit.py localhost:62222
+
+# Detaillierte JSON-Ausgabe
+python3 ssh-audit.py -j localhost:62222 > ssh-audit-report.json
+
+# Policy-Datei für strenge Prüfung erstellen
+cat > policy.txt << 'EOF'
+# SSH Audit Policy - Maximale Sicherheit 2025
+version = 2.0
+banner = /etc/ssh/ssh_banner.txt
+compressions = none
+host keys = ssh-rsa (4096-bit), ssh-ed25519
+kex = curve25519-sha256, curve25519-sha256@libssh.org, diffie-hellman-group16-sha512, diffie-hellman-group18-sha512
+cipher = chacha20-poly1305@openssh.com, aes256-gcm@openssh.com, aes128-gcm@openssh.com, aes256-ctr, aes192-ctr, aes128-ctr
+macs = hmac-sha2-256-etm@openssh.com, hmac-sha2-512-etm@openssh.com
+hostkey = ssh-ed25519, ssh-rsa, ecdsa-sha2-nistp256, ecdsa-sha2-nistp384, ecdsa-sha2-nistp521
+EOF
+
+# Policy-basiertes Audit
+python3 ssh-audit.py -P policy.txt localhost:62222
+```
+
+### Client-Konfiguration aktualisieren
+
+**Windows SSH-Config (`%USERPROFILE%\.ssh\config`):**
+```powershell
+# SSH-Konfiguration aktualisieren
+$sshConfig = @"
+Host proxmox
+    HostName 10.0.0.240
+    User erik
+    Port 62222
+    IdentityFile $env:USERPROFILE\.ssh\proxmox_ed25519
+    IdentitiesOnly yes
+    
+    # Bevorzugte moderne Algorithmen
+    Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com
+    MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com
+    KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org
+    HostKeyAlgorithms ssh-ed25519,ssh-rsa
+"@
+
+$sshConfig | Out-File -FilePath "$env:USERPROFILE\.ssh\config" -Encoding UTF8
+```
+
+**Linux/macOS SSH-Config (`~/.ssh/config`):**
+```bash
+# SSH-Config erstellen/aktualisieren
+cat > ~/.ssh/config << 'EOF'
+Host proxmox
+    HostName 10.0.0.240
+    User erik
+    Port 62222
+    IdentityFile ~/.ssh/proxmox_ed25519
+    IdentitiesOnly yes
+    
+    # Bevorzugte moderne Algorithmen
+    Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com
+    MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com
+    KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org
+    HostKeyAlgorithms ssh-ed25519,ssh-rsa
+EOF
+```
+
+### Verbindung testen
+
+```bash
+# Über SSH-Config verbinden
 ssh proxmox
+
+# Direkte Verbindung
+ssh -p 62222 erik@10.0.0.240
 ```
 
 ## Wichtige Hinweise
