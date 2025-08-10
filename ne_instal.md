@@ -303,6 +303,9 @@ ssh-keygen -t ed25519 -C "erik@pve" -f "$env:USERPROFILE\.ssh\proxmox_ed25519"
 
 # Public Key anzeigen
 Get-Content "$env:USERPROFILE\.ssh\proxmox_ed25519.pub"
+
+$key = Get-Content "$env:USERPROFILE\.ssh\proxmox_ed25519.pub"
+ssh root@10.0.0.240 "echo $key >> ~/.ssh/authorized_keys"
 ```
 
 ### SSH-Keys auf Proxmox installieren
