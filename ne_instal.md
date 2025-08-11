@@ -1,113 +1,201 @@
-### Intel e1000e NIC Offloading Fix
+# Proxmox VE Installation & Konfiguration
+*Enterprise-Grade Setup mit VLAN-Segmentierung und Security Hardening*
+
+## 📋 Inhaltsverzeichnis
+
+1. [Initial Setup](#initial-setup)
+2. [Netzwerk-Architektur](#netzwerk-architektur)
+3. [UniFi Netzwerk-Konfiguration](#unifi-netzwerk-konfiguration)
+4. [Proxmox Netzwerk-Setup](#proxmox-netzwerk-setup)
+5. [Benutzer-Management](#benutzer-management)
+6. [SSH-Konfiguration](#ssh-konfiguration)
+7. [Security Hardening](#security-hardening)
+8. [Firewall & Monitoring](#firewall--monitoring)
+
+---
+
+## Initial Setup
+
+### Proxmox VE Post-Install Skripts
+
+```bash
+# Intel e1000e NIC Offloading Fix
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/nic-offloading-fix.sh)"
 
-### Proxmox VE Post Install
+# Proxmox VE Post Install
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/post-pve-install.sh)"
+```
 
-## Netzwerk-Schema
+---
 
-## UniFi Netzwerk- und Switch-Konfiguration
+## Netzwerk-Architektur
 
-### 1. VLAN-Netzwerke in UniFi erstellen
+### Überblick der Netzwerk-Segmentierung
+
+Die Infrastruktur verwendet VLAN-basierte Netzwerk-Segmentierung für optimale Sicherheit und Organisation:
+
+**IP-Adressbereiche:**
+- **VLAN 1 (Native)**: `10.0.0.0/24` - Home/Management LAN
+- **VLAN 10**: `10.10.0.0/24` - Management Network
+- **VLAN 20**: `10.20.0.0/24` - Production/Server Network  
+- **VLAN 30**: `10.30.0.0/24` - DMZ Network
+
+### Netzwerk-Topologie
+
+```mermaid
+graph TB
+    Internet[🌐 Internet]
+    UDM[UniFi Dream Machine<br/>Router/Firewall]
+    USW[UniFi Switch<br/>Managed Switch]
+    PVE[Proxmox Host<br/>10.0.0.200]
+    
+    Internet --> UDM
+    UDM --> USW
+    USW --> PVE
+    
+    subgraph "VLAN Segmentierung"
+        VLAN1[VLAN 1 - Native<br/>10.0.0.0/24<br/>Home/Management]
+        VLAN10[VLAN 10<br/>10.10.0.0/24<br/>Management]
+        VLAN20[VLAN 20<br/>10.20.0.0/24<br/>Production]
+        VLAN30[VLAN 30<br/>10.30.0.0/24<br/>DMZ]
+    end
+    
+    PVE --> VLAN1
+    PVE --> VLAN10
+    PVE --> VLAN20
+    PVE --> VLAN30
+    
+    style VLAN1 fill:#e1f5fe
+    style VLAN10 fill:#f3e5f5
+    style VLAN20 fill:#e8f5e8
+    style VLAN30 fill:#fff3e0
+```
+
+---
+
+## UniFi Netzwerk-Konfiguration
+
+### 1. VLAN-Netzwerke erstellen
 
 #### VLAN 10 - Management Network
-1. **Settings → Networks** navigieren
-2. **Create New Network** klicken
-3. **Einstellungen**:
-   - **Name**: `VLAN 10 - Management`
-   - **Network Type**: `Standard`
-   - **Router**: `Security Gateway`
-   - **VLAN ID**: `10`
-   - **Gateway/Subnet**: `10.10.0.1/24`
-   - **DHCP Mode**: `DHCP Server`
-   - **DHCP Range**: `10.10.0.100 - 10.10.0.200`
-4. **Save** klicken
 
-#### VLAN 20 - Server/Production Network  
-1. **Create New Network** klicken
-2. **Einstellungen**:
-   - **Name**: `VLAN 20 - Server`
-   - **Network Type**: `Standard`
-   - **Router**: `Security Gateway`
-   - **VLAN ID**: `20`
-   - **Gateway/Subnet**: `10.20.0.1/24`
-   - **DHCP Mode**: `DHCP Server`
-   - **DHCP Range**: `10.20.0.100 - 10.20.0.200`
-3. **Save** klicken
+**Navigation:** Settings → Networks → Create New Network
+
+| Parameter | Wert |
+|-----------|------|
+| Name | `VLAN 10 - Management` |
+| Network Type | `Standard` |
+| Router | `Security Gateway` |
+| VLAN ID | `10` |
+| Gateway/Subnet | `10.10.0.1/24` |
+| DHCP Mode | `DHCP Server` |
+| DHCP Range | `10.10.0.100 - 10.10.0.200` |
+
+#### VLAN 20 - Server/Production Network
+
+| Parameter | Wert |
+|-----------|------|
+| Name | `VLAN 20 - Server` |
+| Network Type | `Standard` |
+| Router | `Security Gateway` |
+| VLAN ID | `20` |
+| Gateway/Subnet | `10.20.0.1/24` |
+| DHCP Mode | `DHCP Server` |
+| DHCP Range | `10.20.0.100 - 10.20.0.200` |
 
 #### VLAN 30 - DMZ Network
-1. **Create New Network** klicken
-2. **Einstellungen**:
-   - **Name**: `VLAN 30 - DMZ`
-   - **Network Type**: `Standard`
-   - **Router**: `Security Gateway`
-   - **VLAN ID**: `30`
-   - **Gateway/Subnet**: `10.30.0.1/24`
-   - **DHCP Mode**: `DHCP Server`
-   - **DHCP Range**: `10.30.0.100 - 10.30.0.200`
-3. **Save** klicken
 
-### 2. Switch-Port-Profil erstellen
+| Parameter | Wert |
+|-----------|------|
+| Name | `VLAN 30 - DMZ` |
+| Network Type | `Standard` |
+| Router | `Security Gateway` |
+| VLAN ID | `30` |
+| Gateway/Subnet | `10.30.0.1/24` |
+| DHCP Mode | `DHCP Server` |
+| DHCP Range | `10.30.0.100 - 10.30.0.200` |
 
-1. **Settings → Profiles → Switch Ports** navigieren
-2. **Create New Profile** klicken
-3. **Profil-Einstellungen**:
-   - **Name**: `Proxmox-Trunk`
-   - **Port Type**: `Trunk`
-   - **Native VLAN/Network**: `10.0.0/24 - Home - LAN (1)`
-   - **Tagged VLANs**: 
-     - `VLAN 10 - Management`
-     - `VLAN 20 - Server`
-     - `VLAN 30 - DMZ`
+### 2. Switch-Port-Profil konfigurieren
 
-### 3. Switch-Port-Profil anwenden
+**Navigation:** Settings → Profiles → Switch Ports
 
-1. **UniFi Devices → [Switch Name]** auswählen
-2. **Ports Tab** öffnen
-3. **Port des Proxmox Hosts** auswählen (z.B. Port wo `eno1` angeschlossen ist)
-4. **Port-Einstellungen**:
-   - **Profile**: `Proxmox-Trunk` auswählen
-   - **Port Isolation**: deaktiviert
-   - **Storm Control**: aktiviert (empfohlen)
-   - **LLDP-MED**: aktiviert
-   - **Spanning Tree Protocol**: aktiviert
-5. **Apply Changes** klicken
+#### Proxmox-Trunk Profil erstellen
 
-### 4. VLAN-Konfiguration prüfen
+| Parameter | Wert |
+|-----------|------|
+| Name | `Proxmox-Trunk` |
+| Port Type | `Trunk` |
+| Native VLAN/Network | `10.0.0/24 - Home - LAN (1)` |
+| Tagged VLANs | `VLAN 10`, `VLAN 20`, `VLAN 30` |
 
-Nach der Konfiguration sollten folgende VLANs verfügbar sein:
-- **VLAN 1**: Management/Home Network (10.0.0.x) - Native
-- **VLAN 10**: Management Network (10.10.0.x) - Tagged
-- **VLAN 20**: Production Network (10.20.0.x) - Tagged
-- **VLAN 30**: DMZ Network (10.30.0.x) - Tagged
+### 3. Switch-Port zuweisen
 
-### 5. Port-Status überprüfen
+**Navigation:** UniFi Devices → [Switch Name] → Ports Tab
 
-1. **Devices → [Switch] → Ports** 
-2. **Port-Status prüfen**:
-   - Link Status: Connected
-   - Speed: 1 Gbps (oder höher)
-   - STP State: Forwarding
-   - Tagged VLANs: 10, 20, 30 sichtbar
+1. Proxmox Host Port auswählen (z.B. wo `eno1` angeschlossen ist)
+2. Profil `Proxmox-Trunk` zuweisen
+3. Zusätzliche Einstellungen:
+   - Port Isolation: **deaktiviert**
+   - Storm Control: **aktiviert**
+   - LLDP-MED: **aktiviert**
+   - Spanning Tree Protocol: **aktiviert**
 
-## Proxmox
+### VLAN-Konfigurationsfluss
 
+```mermaid
+flowchart TD
+    Start([Start UniFi Konfiguration])
+    CreateVLAN[VLAN-Netzwerke erstellen]
+    CreateProfile[Switch-Port-Profil erstellen]
+    AssignProfile[Profil zu Port zuweisen]
+    Verify[Konfiguration verifizieren]
+    End([Konfiguration abgeschlossen])
+    
+    Start --> CreateVLAN
+    CreateVLAN --> CreateProfile
+    CreateProfile --> AssignProfile
+    AssignProfile --> Verify
+    Verify --> End
+    
+    CreateVLAN --> VLAN10[VLAN 10<br/>Management]
+    CreateVLAN --> VLAN20[VLAN 20<br/>Production]  
+    CreateVLAN --> VLAN30[VLAN 30<br/>DMZ]
+    
+    style CreateVLAN fill:#e3f2fd
+    style CreateProfile fill:#f1f8e9
+    style AssignProfile fill:#fff8e1
 ```
+
+---
+
+## Proxmox Netzwerk-Setup
+
+### System-Vorbereitung
+
+```bash
+# System aktualisieren
 apt update && apt upgrade -y
 
-# Sicherheits-Tools installieren
+# Erforderliche Pakete installieren
 apt install ufw git python3 python3-pip fail2ban sudo -y
 
+# VLAN-Modul laden
 echo "8021q" > /etc/modules-load.d/vlan.conf
 lsmod | grep 8021q
+```
 
-# Neue Konfiguration mit VLAN-Bridges erstellen
+### Netzwerk-Interface Konfiguration
+
+```bash
+# Netzwerk-Konfiguration erstellen
 cat > /etc/network/interfaces << 'EOF'
 auto lo
 iface lo inet loopback
 
+# Physisches Interface - Trunk Port
 iface eno1 inet manual
 
+# Native VLAN Bridge (VLAN 1)
 auto vmbr0
 iface vmbr0 inet static
         address 10.0.0.200/24
@@ -116,18 +204,21 @@ iface vmbr0 inet static
         bridge-stp off
         bridge-fd 0
 
+# Management VLAN (VLAN 10)
 auto mgmt10
 iface mgmt10 inet manual
         bridge-ports eno1.10
         bridge-stp off
         bridge-fd 0
 
+# Production VLAN (VLAN 20)
 auto prod20
 iface prod20 inet manual
         bridge-ports eno1.20
         bridge-stp off
         bridge-fd 0
 
+# DMZ VLAN (VLAN 30)
 auto dmz30
 iface dmz30 inet manual
         bridge-ports eno1.30
@@ -137,45 +228,101 @@ iface dmz30 inet manual
 source /etc/network/interfaces.d/*
 EOF
 
-# Netzwerk neu starten
+# Netzwerk-Konfiguration anwenden
 systemctl restart networking
 ```
 
-## Admin-Benutzer einrichten
+### Netzwerk-Bridge-Architektur
 
-### 1. Linux-Benutzer erstellen
+```mermaid
+graph TD
+    Physical[eno1<br/>Physisches Interface<br/>Trunk Port]
+    
+    subgraph "Bridge Konfiguration"
+        vmbr0[vmbr0<br/>Native Bridge<br/>10.0.0.200/24]
+        mgmt10[mgmt10<br/>Management Bridge<br/>VLAN 10]
+        prod20[prod20<br/>Production Bridge<br/>VLAN 20]
+        dmz30[dmz30<br/>DMZ Bridge<br/>VLAN 30]
+    end
+    
+    subgraph "VLAN Tagging"
+        Native[VLAN 1 - Untagged]
+        Tag10[VLAN 10 - Tagged]
+        Tag20[VLAN 20 - Tagged]
+        Tag30[VLAN 30 - Tagged]
+    end
+    
+    Physical --> vmbr0
+    Physical --> mgmt10
+    Physical --> prod20
+    Physical --> dmz30
+    
+    vmbr0 --> Native
+    mgmt10 --> Tag10
+    prod20 --> Tag20
+    dmz30 --> Tag30
+    
+    style Physical fill:#ffeb3b
+    style vmbr0 fill:#e1f5fe
+    style mgmt10 fill:#f3e5f5
+    style prod20 fill:#e8f5e8
+    style dmz30 fill:#fff3e0
+```
+
+---
+
+## Benutzer-Management
+
+### Linux-Benutzer erstellen
 
 ```bash
-# Neuen Linux-Benutzer mit Home-Verzeichnis anlegen
-# -m erstellt automatisch ein Home-Verzeichnis (/home/erik)
+# Benutzer mit Home-Verzeichnis anlegen
 useradd -m -d /home/erik -s /bin/bash erik
 
-# Passwort für den Linux-Benutzer setzen
+# Passwort setzen
 passwd erik
 
+# Sudo-Berechtigung gewähren
 usermod -aG sudo erik
 echo "erik ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/erik
 chmod 440 /etc/sudoers.d/erik
 ```
 
-### 2. Proxmox PAM-User registrieren
+### Proxmox PAM-Integration
 
 ```bash
-# Benutzer in Proxmox als PAM-User registrieren
-# @pam bedeutet: Authentifizierung über das Linux-PAM-System
+# Benutzer in Proxmox registrieren
 pveum user add erik@pam
 
-# (Optional) Passwort auch in Proxmox setzen
-# Meist nicht nötig, da @pam Passwörter direkt aus Linux verwendet
+# (Optional) Proxmox-spezifisches Passwort setzen
 pveum passwd erik@pam
 
-# Vollzugriff in Proxmox gewähren
-# Pfad "/" = Rechte auf gesamte Umgebung
-# Rolle "Administrator" = Root-ähnliche Rechte
+# Administrator-Rechte gewähren
 pveum acl modify / -user erik@pam -role Administrator
 ```
 
-## SSH-Zugang einrichten
+### Benutzer-Management Fluss
+
+```mermaid
+sequenceDiagram
+    participant Admin as Administrator
+    participant Linux as Linux System
+    participant Proxmox as Proxmox VE
+    
+    Admin->>Linux: useradd -m erik
+    Admin->>Linux: passwd erik
+    Admin->>Linux: usermod -aG sudo erik
+    
+    Admin->>Proxmox: pveum user add erik@pam
+    Admin->>Proxmox: pveum acl modify / -user erik@pam -role Administrator
+    
+    Linux-->>Admin: Linux-Benutzer erstellt
+    Proxmox-->>Admin: PAM-Integration abgeschlossen
+```
+
+---
+
+## SSH-Konfiguration
 
 ### SSH-Keys generieren (Windows)
 
@@ -186,17 +333,17 @@ mkdir $env:USERPROFILE\.ssh
 # ED25519 Key generieren
 ssh-keygen -t ed25519 -C "erik@pve" -f "$env:USERPROFILE\.ssh\proxmox_ed25519"
 
+# Public Key auf Server übertragen
 cat $env:USERPROFILE\.ssh\proxmox_ed25519.pub | ssh erik@10.0.0.200 "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
-
 ```
 
-### SSH-Config erstellen (Windows)
+### SSH-Client Konfiguration
 
 ```powershell
-# Basis SSH-Konfiguration erstellen
+# SSH-Konfigurationsdatei erstellen
 $sshConfig = @"
 Host proxmox
-    HostName 10.0.0.240
+    HostName 10.0.0.200
     User erik
     Port 22
     IdentityFile $env:USERPROFILE\.ssh\proxmox_ed25519
@@ -206,30 +353,23 @@ Host proxmox
 $sshConfig | Out-File -FilePath "$env:USERPROFILE\.ssh\config" -Encoding UTF8
 ```
 
+---
 
-## SSH-Sicherheit Härtung (Enterprise-Grade)
+## Security Hardening
 
-### 🔒 Sicherheitslevel: Enterprise (96/100)
+### 🔒 Enterprise SSH-Härtung (Security Level: 96/100)
 
-### 1. System-Pakete installieren
-
-```bash
-
-### 2. SSH-Konfiguration sichern
+#### 1. Konfigurationssicherung
 
 ```bash
-# Backup der Original-Konfiguration erstellen
+# Backup erstellen
 sudo mkdir -p /etc/ssh/backups
 sudo cp /etc/ssh/sshd_config /etc/ssh/backups/sshd_config.backup.$(date +%Y%m%d_%H%M%S)
-
-# Backup verifizieren
-ls -la /etc/ssh/backups/
 ```
 
-### 3. Enterprise SSH-Konfiguration erstellen
+#### 2. Enterprise SSH-Konfiguration
 
 ```bash
-# Moderne SSH-Härtung implementieren
 sudo tee /etc/ssh/sshd_config.d/99-security-hardening.conf << 'EOF'
 # =============================================================================
 # SSH Security Hardening Configuration - Enterprise Standards 2025
@@ -266,7 +406,7 @@ PubkeyAcceptedAlgorithms ssh-ed25519,ssh-rsa,ecdsa-sha2-nistp256,ecdsa-sha2-nist
 # Root Access - Komplett deaktiviert
 PermitRootLogin no
 
-# User Authentication (ÄNDERN SIE 'erik' ZU IHREM BENUTZERNAMEN)
+# User Authentication
 AllowUsers erik
 DenyUsers root
 DenyGroups root
@@ -278,12 +418,8 @@ AuthorizedKeysFile .ssh/authorized_keys .ssh/authorized_keys2
 # Password Authentication - Deaktiviert
 PasswordAuthentication no
 PermitEmptyPasswords no
-
-# Challenge Response - Deaktiviert
 ChallengeResponseAuthentication no
 KbdInteractiveAuthentication no
-
-# PAM - Deaktiviert für Key-only Auth
 UsePAM no
 
 # =============================================================================
@@ -304,77 +440,45 @@ LoginGraceTime 30
 # Feature Restrictions
 # =============================================================================
 
-# X11 Forwarding - Sicherheitsrisiko
+# Security Features
 X11Forwarding no
-X11DisplayOffset 10
-X11UseLocalhost yes
-
-# TCP/Port Forwarding - Kontrolliert
 AllowTcpForwarding local
 AllowStreamLocalForwarding no
 GatewayPorts no
-
-# Agent Forwarding - Sicherheitsrisiko
 AllowAgentForwarding no
-
-# Tunneling
 PermitTunnel no
-
-# User Environment
 PermitUserEnvironment no
 
 # =============================================================================
 # Logging and Monitoring
 # =============================================================================
 
-# Logging
 SyslogFacility AUTHPRIV
 LogLevel VERBOSE
-
-# Banner
 Banner /etc/ssh/ssh_banner.txt
-
-# =============================================================================
-# Modern Security Features
-# =============================================================================
-
-# Strict Modes
-StrictModes yes
-
-# Compression - Sicherheitsrisiko
-Compression no
-
-# TCP Keep Alive
-TCPKeepAlive yes
-
-# DNS
-UseDNS no
-
-# MOTD
-PrintMotd no
-PrintLastLog yes
-
-# Subsystem
-Subsystem sftp /usr/lib/openssh/sftp-server -f AUTHPRIV -l INFO
 
 # =============================================================================
 # Additional Security
 # =============================================================================
 
-# Disable unused authentication methods
+StrictModes yes
+Compression no
+TCPKeepAlive yes
+UseDNS no
+PrintMotd no
+PrintLastLog yes
+
+Subsystem sftp /usr/lib/openssh/sftp-server -f AUTHPRIV -l INFO
+
 GSSAPIAuthentication no
 HostbasedAuthentication no
 IgnoreUserKnownHosts yes
-
-# Modern ciphers only
 RequiredRSASize 2048
-
-# Prevent weak configurations
 DebianBanner no
 EOF
 ```
 
-### 4. Sicherheits-Banner erstellen
+#### 3. Sicherheitsbanner
 
 ```bash
 sudo tee /etc/ssh/ssh_banner.txt << 'EOF'
@@ -395,7 +499,7 @@ sudo tee /etc/ssh/ssh_banner.txt << 'EOF'
 EOF
 ```
 
-### 5. Starke Host-Keys generieren
+#### 4. Starke Host-Keys generieren
 
 ```bash
 # Bestehende Keys sichern
@@ -405,112 +509,110 @@ sudo cp -r /etc/ssh /etc/ssh.backup
 sudo rm -f /etc/ssh/ssh_host_dsa_key*
 sudo rm -f /etc/ssh/ssh_host_ecdsa_key*
 
-# Neue starke RSA-Keys generieren (4096-bit)
+# Neue starke Keys generieren
 sudo ssh-keygen -t rsa -b 4096 -f /etc/ssh/ssh_host_rsa_key -N ""
-
-# ED25519-Key neu generieren
-sudo rm -f /etc/ssh/ssh_host_ed25519_key*
 sudo ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N ""
 
-# Korrekte Berechtigungen setzen
+# Berechtigungen setzen
 sudo chmod 600 /etc/ssh/ssh_host_*_key
 sudo chmod 644 /etc/ssh/ssh_host_*_key.pub
 ```
 
-### 6. Konfiguration testen und anwenden
+#### 5. Konfiguration aktivieren
 
 ```bash
-# SSH-Konfiguration testen
+# Konfiguration testen
 sudo sshd -t
 
-# Bei erfolgreichem Test SSH-Service neu laden
+# SSH-Service neu laden
 sudo systemctl reload sshd
 
-# SSH-Service Status prüfen
+# Status prüfen
 sudo systemctl status sshd
-
-# Prüfen ob neuer Port lauscht
 sudo ss -tlnp | grep :62222
 ```
 
-### 7. Client-Konfiguration aktualisieren
+### SSH Security Hardening Übersicht
 
-**Windows SSH-Config (`%USERPROFILE%\.ssh\config`):**
-```powershell
-$sshConfig = @"
-Host proxmox
-    HostName 10.0.0.200
-    User erik
-    Port 62222
-    IdentityFile $env:USERPROFILE\.ssh\proxmox_ed25519
-    IdentitiesOnly yes
+```mermaid
+graph TD
+    Start([SSH Hardening Start])
     
-    # Bevorzugte moderne Algorithmen
-    Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com
-    MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com
-    KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org
-    HostKeyAlgorithms ssh-ed25519,ssh-rsa
-"@
-
-$sshConfig | Out-File -FilePath "$env:USERPROFILE\.ssh\config" -Encoding UTF8
+    subgraph "Konfiguration"
+        Backup[Backup erstellen]
+        Config[Enterprise Config]
+        Banner[Security Banner]
+        Keys[Starke Host-Keys]
+    end
+    
+    subgraph "Security Features"
+        NoRoot[Root Login deaktiviert]
+        KeyOnly[Nur Key-Authentication]
+        Modern[Moderne Verschlüsselung]
+        Limits[Connection Limits]
+    end
+    
+    Test[Konfiguration testen]
+    Apply[SSH neu laden]
+    Verify[Verbindung testen]
+    End([Hardening abgeschlossen])
+    
+    Start --> Backup
+    Backup --> Config
+    Config --> Banner
+    Banner --> Keys
+    Keys --> Test
+    Test --> Apply
+    Apply --> Verify
+    Verify --> End
+    
+    Config --> NoRoot
+    Config --> KeyOnly
+    Config --> Modern
+    Config --> Limits
+    
+    style NoRoot fill:#ffcdd2
+    style KeyOnly fill:#c8e6c9
+    style Modern fill:#dcedc8
+    style Limits fill:#fff9c4
 ```
 
-### 8. SSH-Verbindung testen
+---
+
+## Firewall & Monitoring
+
+### UFW Firewall-Konfiguration
 
 ```bash
-# Über SSH-Config verbinden
-ssh proxmox
-
-# Direkte Verbindung
-ssh -p 62222 erik@10.0.0.200
-```
-
-## Firewall-Konfiguration (UFW)
-
-### UFW Firewall einrichten
-
-```bash
-# IPv6 sofort deaktivieren
+# IPv6 systemweit deaktivieren
 echo 'net.ipv6.conf.all.disable_ipv6 = 1' | sudo tee -a /etc/sysctl.conf
 echo 'net.ipv6.conf.default.disable_ipv6 = 1' | sudo tee -a /etc/sysctl.conf
 echo 'net.ipv6.conf.lo.disable_ipv6 = 1' | sudo tee -a /etc/sysctl.conf
-
-# Änderungen sofort anwenden
 sudo sysctl -p
 
-# IPv6 über GRUB deaktivieren
+# GRUB-Konfiguration aktualisieren
 sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="quiet"/GRUB_CMDLINE_LINUX_DEFAULT="quiet ipv6.disable=1"/' /etc/default/grub
 sudo update-grub
 
-# IPv6 in UFW-Konfiguration deaktivieren
+# UFW IPv6 deaktivieren
 sudo sed -i 's/IPV6=yes/IPV6=no/' /etc/default/ufw
 
-# UFW neu laden
-sudo ufw --force reload
-
-# Standard-Richtlinien setzen
+# Standard-Richtlinien
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 
-# SSH-Port erlauben (gehärteter Port)
+# Service-Ports öffnen
 sudo ufw allow from 10.0.0.0/16 to any port 62222 proto tcp comment 'SSH Hardened from local network'
-
-# Proxmox Web-Interface erlauben
 sudo ufw allow from 10.0.0.0/16 to any port 8006 proto tcp comment 'Proxmox WebUI from local network'
 
 # Firewall aktivieren
 sudo ufw --force enable
-
-# Firewall-Status prüfen
-sudo ufw status verbose
 ```
 
-## Fail2Ban Setup
-
-### Fail2Ban für SSH-Schutz konfigurieren
+### Fail2Ban Konfiguration
 
 ```bash
-# Basis SSH-Schutz konfigurieren
+# SSH-Basis-Schutz
 sudo tee /etc/fail2ban/jail.d/sshd-hardened.conf << 'EOF'
 [sshd]
 enabled = true
@@ -524,7 +626,7 @@ bantime = 3600
 ignoreip = 127.0.0.1/8 10.0.0.0/16
 EOF
 
-# Aggressiven SSH-Schutz hinzufügen
+# Aggressiver SSH-Schutz
 sudo tee /etc/fail2ban/jail.d/ssh-aggressive.conf << 'EOF'
 [sshd-aggressive]
 enabled = true
@@ -538,13 +640,154 @@ bantime = 600
 ignoreip = 127.0.0.1/8 10.0.0.0/16
 EOF
 
-# fail2ban neu starten
+# Fail2Ban aktivieren
 sudo systemctl restart fail2ban
-
-# Status überprüfen
-sudo fail2ban-client status
-sudo fail2ban-client status sshd
-sudo fail2ban-client status sshd-aggressive
 ```
 
-**Proxmox-Server ist produktionsreif und sicherer als die meisten Enterprise-Systeme!**
+### Security & Monitoring Übersicht
+
+```mermaid
+graph TD
+    Security[🛡️ Security Layer]
+    
+    subgraph "Network Security"
+        UFW[UFW Firewall<br/>Port-basierte Kontrolle]
+        VLAN[VLAN Segmentierung<br/>Netzwerk-Isolation]
+        NoIPv6[IPv6 deaktiviert<br/>Attack Surface reduziert]
+    end
+    
+    subgraph "Access Security"
+        SSH[SSH Hardening<br/>Enterprise Standards]
+        KeyAuth[Key-only Authentication<br/>Keine Passwort-Auth]
+        Fail2Ban[Fail2Ban<br/>Brute-Force-Schutz]
+    end
+    
+    subgraph "Monitoring"
+        Logs[Verbose Logging<br/>AUTHPRIV Facility]
+        Banner[Warning Banner<br/>Legal Notice]
+        Status[Connection Monitoring<br/>MaxTries & Timeouts]
+    end
+    
+    Security --> UFW
+    Security --> VLAN
+    Security --> NoIPv6
+    Security --> SSH
+    Security --> KeyAuth
+    Security --> Fail2Ban
+    Security --> Logs
+    Security --> Banner
+    Security --> Status
+    
+    style Security fill:#c5e1a5
+    style UFW fill:#ffcdd2
+    style SSH fill:#f8bbd9
+    style Fail2Ban fill:#e1bee7
+```
+
+---
+
+## 📊 Konfigurationsübersicht
+
+### Abgeschlossene Sicherheitsmaßnahmen
+
+| Komponente | Status | Security Level |
+|------------|---------|----------------|
+| SSH Hardening | ✅ Implementiert | 96/100 |
+| Firewall (UFW) | ✅ Konfiguriert | Enterprise |
+| Fail2Ban | ✅ Aktiv | Aggressiv |
+| VLAN Segmentierung | ✅ Implementiert | Production |
+| IPv6 Deaktivierung | ✅ Systemweit | Komplett |
+| Key-only Authentication | ✅ Erzwungen | Obligatorisch |
+
+### Netzwerk-Ports
+
+| Service | Port | Zugriff | Protokoll |
+|---------|------|---------|-----------|
+| SSH (gehärtet) | 62222 | LAN only | TCP |
+| Proxmox WebUI | 8006 | LAN only | HTTPS |
+| Standard SSH | 22 | ❌ Deaktiviert | - |
+
+### Finale System-Architektur
+
+```mermaid
+graph TB
+    Internet[🌐 Internet]
+    
+    subgraph "Edge Security"
+        UDM[UniFi Dream Machine<br/>🔥 Firewall & Router]
+        USW[UniFi Switch<br/>📡 VLAN Management]
+    end
+    
+    subgraph "Proxmox Host - 10.0.0.200"
+        PVE[Proxmox VE<br/>🖥️ Hypervisor]
+        UFW[UFW Firewall<br/>🛡️ Host Protection]
+        SSH[SSH Service<br/>🔐 Port 62222]
+        F2B[Fail2Ban<br/>⚔️ Intrusion Prevention]
+    end
+    
+    subgraph "Network Segments"
+        MGMT[Management VLAN 10<br/>🔧 10.10.0.0/24]
+        PROD[Production VLAN 20<br/>⚙️ 10.20.0.0/24]
+        DMZ[DMZ VLAN 30<br/>🌐 10.30.0.0/24]
+    end
+    
+    Internet --> UDM
+    UDM --> USW
+    USW --> PVE
+    PVE --> UFW
+    UFW --> SSH
+    UFW --> F2B
+    
+    PVE --> MGMT
+    PVE --> PROD
+    PVE --> DMZ
+    
+    style UDM fill:#ff9800
+    style PVE fill:#4caf50
+    style UFW fill:#f44336
+    style SSH fill:#9c27b0
+    style F2B fill:#ff5722
+```
+
+---
+
+## ✅ Deployment-Checkliste
+
+### Pre-Deployment
+- [ ] UniFi Controller zugänglich
+- [ ] Proxmox Host-Hardware bereit
+- [ ] Netzwerk-Kabel angeschlossen
+
+### UniFi-Konfiguration
+- [ ] VLAN 10 (Management) erstellt
+- [ ] VLAN 20 (Production) erstellt  
+- [ ] VLAN 30 (DMZ) erstellt
+- [ ] Switch-Port-Profil "Proxmox-Trunk" erstellt
+- [ ] Trunk-Profil zu Proxmox-Port zugewiesen
+
+### Proxmox-Setup
+- [ ] Post-Install-Skripte ausgeführt
+- [ ] Netzwerk-Interfaces konfiguriert
+- [ ] VLAN-Bridges erstellt
+- [ ] Admin-Benutzer "erik" angelegt
+- [ ] PAM-Integration konfiguriert
+
+### Security-Hardening
+- [ ] SSH auf Port 62222 gehärtet
+- [ ] Enterprise SSH-Konfiguration implementiert
+- [ ] Starke Host-Keys generiert
+- [ ] UFW Firewall konfiguriert
+- [ ] IPv6 systemweit deaktiviert
+- [ ] Fail2Ban aktiviert
+
+### Verbindungstest
+- [ ] SSH-Verbindung über gehärteten Port funktioniert
+- [ ] Proxmox WebUI (Port 8006) erreichbar
+- [ ] Firewall-Regeln funktional
+- [ ] Fail2Ban-Status überprüft
+
+---
+
+**🎯 Das System ist jetzt produktionsreif und sicherer als die meisten Enterprise-Systeme!**
+
+*Dokumentation erstellt am: $(date)*
