@@ -177,8 +177,8 @@ systemctl restart networking
 ```
 
 ### Netzwerk-Bridge-Architektur
-
 ```mermaid
+%%{init: {'theme':'dark','themeVariables':{'primaryColor':'#4f46e5','primaryTextColor':'#e5e7eb','primaryBorderColor':'#6b7280','lineColor':'#9ca3af','background':'#1f2937','secondaryColor':'#374151','tertiaryColor':'#111827'}}}%%
 graph TD
     Physical[eno1<br/>Physisches Interface<br/>Trunk Port]
     
@@ -206,14 +206,16 @@ graph TD
     prod20 --> Tag20
     dmz30 --> Tag30
     
-    style Physical fill:#ffeb3b
-    style vmbr0 fill:#e1f5fe
-    style mgmt10 fill:#f3e5f5
-    style prod20 fill:#e8f5e8
-    style dmz30 fill:#fff3e0
+    style Physical fill:#f59e0b,stroke:#fbbf24,color:#000000
+    style vmbr0 fill:#1e40af,stroke:#3b82f6,color:#ffffff
+    style mgmt10 fill:#7c3aed,stroke:#8b5cf6,color:#ffffff
+    style prod20 fill:#059669,stroke:#10b981,color:#ffffff
+    style dmz30 fill:#d97706,stroke:#f59e0b,color:#ffffff
+    style Native fill:#1e40af,stroke:#3b82f6,color:#ffffff
+    style Tag10 fill:#7c3aed,stroke:#8b5cf6,color:#ffffff
+    style Tag20 fill:#059669,stroke:#10b981,color:#ffffff
+    style Tag30 fill:#d97706,stroke:#f59e0b,color:#ffffff
 ```
-
----
 
 ## Benutzer-Management
 
