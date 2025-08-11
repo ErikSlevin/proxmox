@@ -42,35 +42,6 @@ Die Infrastruktur verwendet VLAN-basierte Netzwerk-Segmentierung für optimale S
 
 ### Netzwerk-Topologie
 
-```mermaid
-graph TB
-    Internet[🌐 Internet]
-    UDM[UniFi Dream Machine<br/>Router/Firewall]
-    USW[UniFi Switch<br/>Managed Switch]
-    PVE[Proxmox Host<br/>10.0.0.200]
-    
-    Internet --> UDM
-    UDM --> USW
-    USW --> PVE
-    
-    subgraph "VLAN Segmentierung"
-        VLAN1[VLAN 1 - Native<br/>10.0.0.0/24<br/>Home/Management]
-        VLAN10[VLAN 10<br/>10.10.0.0/24<br/>Management]
-        VLAN20[VLAN 20<br/>10.20.0.0/24<br/>Production]
-        VLAN30[VLAN 30<br/>10.30.0.0/24<br/>DMZ]
-    end
-    
-    PVE --> VLAN1
-    PVE --> VLAN10
-    PVE --> VLAN20
-    PVE --> VLAN30
-    
-    style VLAN1 fill:#e1f5fe
-    style VLAN10 fill:#f3e5f5
-    style VLAN20 fill:#e8f5e8
-    style VLAN30 fill:#fff3e0
-```
-
 ---
 
 ## UniFi Netzwerk-Konfiguration
@@ -140,33 +111,6 @@ graph TB
    - LLDP-MED: **aktiviert**
    - Spanning Tree Protocol: **aktiviert**
 
-### VLAN-Konfigurationsfluss
-
-```mermaid
-flowchart TD
-    Start([Start UniFi Konfiguration])
-    CreateVLAN[VLAN-Netzwerke erstellen]
-    CreateProfile[Switch-Port-Profil erstellen]
-    AssignProfile[Profil zu Port zuweisen]
-    Verify[Konfiguration verifizieren]
-    End([Konfiguration abgeschlossen])
-    
-    Start --> CreateVLAN
-    CreateVLAN --> CreateProfile
-    CreateProfile --> AssignProfile
-    AssignProfile --> Verify
-    Verify --> End
-    
-    CreateVLAN --> VLAN10[VLAN 10<br/>Management]
-    CreateVLAN --> VLAN20[VLAN 20<br/>Production]  
-    CreateVLAN --> VLAN30[VLAN 30<br/>DMZ]
-    
-    style CreateVLAN fill:#e3f2fd
-    style CreateProfile fill:#f1f8e9
-    style AssignProfile fill:#fff8e1
-```
-
----
 
 ## Proxmox Netzwerk-Setup
 
@@ -301,26 +245,6 @@ pveum passwd erik@pam
 pveum acl modify / -user erik@pam -role Administrator
 ```
 
-### Benutzer-Management Fluss
-
-```mermaid
-sequenceDiagram
-    participant Admin as Administrator
-    participant Linux as Linux System
-    participant Proxmox as Proxmox VE
-    
-    Admin->>Linux: useradd -m erik
-    Admin->>Linux: passwd erik
-    Admin->>Linux: usermod -aG sudo erik
-    
-    Admin->>Proxmox: pveum user add erik@pam
-    Admin->>Proxmox: pveum acl modify / -user erik@pam -role Administrator
-    
-    Linux-->>Admin: Linux-Benutzer erstellt
-    Proxmox-->>Admin: PAM-Integration abgeschlossen
-```
-
----
 
 ## SSH-Konfiguration
 
@@ -532,52 +456,6 @@ sudo systemctl status sshd
 sudo ss -tlnp | grep :62222
 ```
 
-### SSH Security Hardening Übersicht
-
-```mermaid
-graph TD
-    Start([SSH Hardening Start])
-    
-    subgraph "Konfiguration"
-        Backup[Backup erstellen]
-        Config[Enterprise Config]
-        Banner[Security Banner]
-        Keys[Starke Host-Keys]
-    end
-    
-    subgraph "Security Features"
-        NoRoot[Root Login deaktiviert]
-        KeyOnly[Nur Key-Authentication]
-        Modern[Moderne Verschlüsselung]
-        Limits[Connection Limits]
-    end
-    
-    Test[Konfiguration testen]
-    Apply[SSH neu laden]
-    Verify[Verbindung testen]
-    End([Hardening abgeschlossen])
-    
-    Start --> Backup
-    Backup --> Config
-    Config --> Banner
-    Banner --> Keys
-    Keys --> Test
-    Test --> Apply
-    Apply --> Verify
-    Verify --> End
-    
-    Config --> NoRoot
-    Config --> KeyOnly
-    Config --> Modern
-    Config --> Limits
-    
-    style NoRoot fill:#ffcdd2
-    style KeyOnly fill:#c8e6c9
-    style Modern fill:#dcedc8
-    style Limits fill:#fff9c4
-```
-
----
 
 ## Firewall & Monitoring
 
@@ -644,48 +522,6 @@ EOF
 sudo systemctl restart fail2ban
 ```
 
-### Security & Monitoring Übersicht
-
-```mermaid
-graph TD
-    Security[🛡️ Security Layer]
-    
-    subgraph "Network Security"
-        UFW[UFW Firewall<br/>Port-basierte Kontrolle]
-        VLAN[VLAN Segmentierung<br/>Netzwerk-Isolation]
-        NoIPv6[IPv6 deaktiviert<br/>Attack Surface reduziert]
-    end
-    
-    subgraph "Access Security"
-        SSH[SSH Hardening<br/>Enterprise Standards]
-        KeyAuth[Key-only Authentication<br/>Keine Passwort-Auth]
-        Fail2Ban[Fail2Ban<br/>Brute-Force-Schutz]
-    end
-    
-    subgraph "Monitoring"
-        Logs[Verbose Logging<br/>AUTHPRIV Facility]
-        Banner[Warning Banner<br/>Legal Notice]
-        Status[Connection Monitoring<br/>MaxTries & Timeouts]
-    end
-    
-    Security --> UFW
-    Security --> VLAN
-    Security --> NoIPv6
-    Security --> SSH
-    Security --> KeyAuth
-    Security --> Fail2Ban
-    Security --> Logs
-    Security --> Banner
-    Security --> Status
-    
-    style Security fill:#c5e1a5
-    style UFW fill:#ffcdd2
-    style SSH fill:#f8bbd9
-    style Fail2Ban fill:#e1bee7
-```
-
----
-
 ## 📊 Konfigurationsübersicht
 
 ### Abgeschlossene Sicherheitsmaßnahmen
@@ -706,87 +542,6 @@ graph TD
 | SSH (gehärtet) | 62222 | LAN only | TCP |
 | Proxmox WebUI | 8006 | LAN only | HTTPS |
 | Standard SSH | 22 | ❌ Deaktiviert | - |
-
-### Finale System-Architektur
-
-```mermaid
-graph TB
-    Internet[🌐 Internet]
-    
-    subgraph "Edge Security"
-        UDM[UniFi Dream Machine<br/>🔥 Firewall & Router]
-        USW[UniFi Switch<br/>📡 VLAN Management]
-    end
-    
-    subgraph "Proxmox Host - 10.0.0.200"
-        PVE[Proxmox VE<br/>🖥️ Hypervisor]
-        UFW[UFW Firewall<br/>🛡️ Host Protection]
-        SSH[SSH Service<br/>🔐 Port 62222]
-        F2B[Fail2Ban<br/>⚔️ Intrusion Prevention]
-    end
-    
-    subgraph "Network Segments"
-        MGMT[Management VLAN 10<br/>🔧 10.10.0.0/24]
-        PROD[Production VLAN 20<br/>⚙️ 10.20.0.0/24]
-        DMZ[DMZ VLAN 30<br/>🌐 10.30.0.0/24]
-    end
-    
-    Internet --> UDM
-    UDM --> USW
-    USW --> PVE
-    PVE --> UFW
-    UFW --> SSH
-    UFW --> F2B
-    
-    PVE --> MGMT
-    PVE --> PROD
-    PVE --> DMZ
-    
-    style UDM fill:#ff9800
-    style PVE fill:#4caf50
-    style UFW fill:#f44336
-    style SSH fill:#9c27b0
-    style F2B fill:#ff5722
-```
-
----
-
-## ✅ Deployment-Checkliste
-
-### Pre-Deployment
-- [ ] UniFi Controller zugänglich
-- [ ] Proxmox Host-Hardware bereit
-- [ ] Netzwerk-Kabel angeschlossen
-
-### UniFi-Konfiguration
-- [ ] VLAN 10 (Management) erstellt
-- [ ] VLAN 20 (Production) erstellt  
-- [ ] VLAN 30 (DMZ) erstellt
-- [ ] Switch-Port-Profil "Proxmox-Trunk" erstellt
-- [ ] Trunk-Profil zu Proxmox-Port zugewiesen
-
-### Proxmox-Setup
-- [ ] Post-Install-Skripte ausgeführt
-- [ ] Netzwerk-Interfaces konfiguriert
-- [ ] VLAN-Bridges erstellt
-- [ ] Admin-Benutzer "erik" angelegt
-- [ ] PAM-Integration konfiguriert
-
-### Security-Hardening
-- [ ] SSH auf Port 62222 gehärtet
-- [ ] Enterprise SSH-Konfiguration implementiert
-- [ ] Starke Host-Keys generiert
-- [ ] UFW Firewall konfiguriert
-- [ ] IPv6 systemweit deaktiviert
-- [ ] Fail2Ban aktiviert
-
-### Verbindungstest
-- [ ] SSH-Verbindung über gehärteten Port funktioniert
-- [ ] Proxmox WebUI (Port 8006) erreichbar
-- [ ] Firewall-Regeln funktional
-- [ ] Fail2Ban-Status überprüft
-
----
 
 **🎯 Das System ist jetzt produktionsreif und sicherer als die meisten Enterprise-Systeme!**
 
