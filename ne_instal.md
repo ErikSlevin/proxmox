@@ -799,6 +799,9 @@ sudo fail2ban-client status
 sudo systemctl enable fail2ban
 sudo systemctl restart fail2ban
 
+# Neustarten
+sudo reboot
+
 # Status prüfen
 sudo fail2ban-client status
 sudo fail2ban-client status sshd
