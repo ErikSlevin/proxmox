@@ -1,6 +1,15 @@
 # Proxmox VE Installation & Konfiguration - Homeserver Optimiert
 *Enterprise-Grade Setup mit VLAN-aware Bridge und Security Hardening*
 
+```
+# GUI Setup via USB
+- ext4
+- swapsize 8GB
+- maxroot 32GB
+- minfree 10GB
+- maxvz freilassen 
+```
+
 ## 📋 Inhaltsverzeichnis
 
 1. [Initial Setup](#initial-setup)
