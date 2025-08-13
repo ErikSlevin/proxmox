@@ -237,3 +237,8 @@ systemctl reload sshd
 # Status prüfen
 systemctl status sshd
 ss -tlnp | grep :62222
+
+#ansibe
+apt install sudo -y
+
+su - erik 
