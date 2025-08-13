@@ -342,22 +342,6 @@ pvelog                # Live-Logs verfolgen
 # Logout von erik
 exit
 ```
-
-### 🔍 **Warum Sudo-Aliase bei Proxmox?**
-
-**Technischer Hintergrund:**
-- Proxmox verwendet **IPC-Socket-Kommunikation** für administrative Befehle
-- Diese erfordern **erhöhte Berechtigungen** (sudo) für Sicherheit
-- **Enterprise-Standard**: Administrative Operationen benötigen sudo-Rechte
-- **Beste Praxis**: Aliase bieten Komfort ohne Sicherheitseinbußen
-
-**Vorteile der Alias-Lösung:**
-- ✅ **Sicherheit**: Sudo-Rechte für kritische Operationen
-- ✅ **Komfort**: Kurze, einprägsame Befehle
-- ✅ **Vollständig**: Alle Proxmox-Funktionen abgedeckt
-- ✅ **Professional**: Entspricht Enterprise-Standards
-- ✅ **Wartungsfreundlich**: Keine komplexe Berechtigungskonfiguration
-
 ### 📊 **Verfügbare Alias-Kategorien**
 
 | Kategorie | Anzahl | Beispiele |
