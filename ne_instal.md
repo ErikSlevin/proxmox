@@ -698,6 +698,8 @@ sudo ufw status numbered
 
 #### 1. SSH-Schutz (Basis)
 
+##### Standard SSH-Jail (Port 62222)
+
 ```bash
 sudo tee /etc/fail2ban/jail.d/sshd-hardened.conf << 'EOF'
 [sshd]
@@ -713,7 +715,7 @@ ignoreip = 127.0.0.1/8 10.0.0.0/16
 EOF
 ```
 
-#### 2. SSH-Schutz (Aggressiv)
+##### Aggressiver SSH-Jail (Schnelle Reaktion)
 
 ```bash
 sudo tee /etc/fail2ban/jail.d/ssh-aggressive.conf << 'EOF'
@@ -732,25 +734,65 @@ EOF
 
 #### 3. Proxmox WebUI Schutz
 
+##### Filter erstellen (wichtig: in filter.d/, nicht jail.d/)
+
 ```bash
-sudo tee /etc/fail2ban/jail.d/proxmox-web.conf << 'EOF'
-[proxmox-web]
+# Proxmox-spezifischen Filter definieren
+sudo tee /etc/fail2ban/filter.d/proxmox.conf << 'EOF'
+# Fail2Ban filter for Proxmox VE
+[Definition]
+failregex = pvedaemon\[.*authentication failure.*rip=<HOST>
+            pveproxy\[.*authentication failure.*from <HOST>
+            pvedaemon\[.*failed authentication.*IP <HOST>
+ignoreregex =
+EOF
+```
+
+##### Proxmox Jail aktivieren
+
+```bash
+sudo tee /etc/fail2ban/jail.d/proxmox.conf << 'EOF'
+[proxmox]
 enabled = true
 port = 8006
-filter = proxmox-web
+filter = proxmox
 logpath = /var/log/daemon.log
-backend = systemd
 maxretry = 5
 findtime = 300
 bantime = 1800
 ignoreip = 127.0.0.1/8 10.0.0.0/16
-
-[Definition]
-failregex = pvedaemon\[.*authentication failure.*rip=<HOST>
+backend = systemd
 EOF
 ```
 
-#### 4. Fail2Ban aktivieren
+#### 4. Fail2ban aktivieren und verifizieren
+
+```bash
+# Konfiguration testen
+sudo fail2ban-client -t
+
+# Service neu laden
+sudo fail2ban-client reload
+
+# Status prüfen
+sudo fail2ban-client status
+
+# Erwartete Ausgabe:
+# Status
+# |- Number of jail:      3
+# `- Jail list:   proxmox, sshd, sshd-aggressive
+```
+
+
+#### Fail2ban Jail-Übersicht
+
+| Jail | Port | Max Versuche | Zeitfenster | Bann-Dauer | Zweck |
+|------|------|--------------|-------------|------------|--------|
+| **sshd** | 62222 | 3 | 10 Min | 1 Stunde | Standard SSH-Schutz |
+| **sshd-aggressive** | 62222 | 6 | 1 Min | 10 Min | Schnelle Reaktion bei Angriffen |
+| **proxmox** | 8006 | 5 | 5 Min | 30 Min | WebUI-Schutz |
+
+#### 5. Fail2Ban aktivieren
 
 ```bash
 # Service starten und aktivieren
