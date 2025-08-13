@@ -1,5 +1,5 @@
-# Proxmox VE Installation & Konfiguration
-*Enterprise-Grade Setup mit VLAN-Segmentierung und Security Hardening*
+# Proxmox VE Installation & Konfiguration - Homeserver Optimiert
+*Enterprise-Grade Setup mit VLAN-aware Bridge und Security Hardening*
 
 ## 📋 Inhaltsverzeichnis
 
@@ -32,7 +32,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/Proxmo
 
 ### Überblick der Netzwerk-Segmentierung
 
-Die Infrastruktur verwendet VLAN-basierte Netzwerk-Segmentierung für optimale Sicherheit und Organisation:
+Die Infrastruktur verwendet eine moderne **VLAN-aware Bridge** für optimale Performance und einfache Verwaltung:
 
 **IP-Adressbereiche:**
 - **VLAN 1 (Native)**: `10.0.0.0/24` - Home/Management LAN
@@ -40,7 +40,37 @@ Die Infrastruktur verwendet VLAN-basierte Netzwerk-Segmentierung für optimale S
 - **VLAN 20**: `10.20.0.0/24` - Production/Server Network  
 - **VLAN 30**: `10.30.0.0/24` - DMZ Network
 
-### Netzwerk-Topologie
+### Moderne VLAN-aware Architektur
+
+```mermaid
+%%{init: {'theme':'dark','themeVariables':{'primaryColor':'#4f46e5','primaryTextColor':'#e5e7eb','primaryBorderColor':'#6b7280','lineColor':'#9ca3af','background':'#1f2937','secondaryColor':'#374151','tertiaryColor':'#111827'}}}%%
+graph TD
+    Physical[eno1<br/>Physisches Interface<br/>Trunk Port]
+    
+    subgraph "VLAN-aware Bridge (Modern)"
+        vmbr0[vmbr0<br/>VLAN-aware Bridge<br/>10.0.0.200/24<br/>bridge-vids: 10,20,30]
+    end
+    
+    subgraph "VM VLAN-Zuordnung"
+        VM1[VMs - Native VLAN<br/>Bridge: vmbr0<br/>VLAN Tag: leer]
+        VM10[VMs - Management<br/>Bridge: vmbr0<br/>VLAN Tag: 10]
+        VM20[VMs - Production<br/>Bridge: vmbr0<br/>VLAN Tag: 20]
+        VM30[VMs - DMZ<br/>Bridge: vmbr0<br/>VLAN Tag: 30]
+    end
+    
+    Physical --> vmbr0
+    vmbr0 --> VM1
+    vmbr0 --> VM10
+    vmbr0 --> VM20
+    vmbr0 --> VM30
+    
+    style Physical fill:#f59e0b,stroke:#fbbf24,color:#000000
+    style vmbr0 fill:#1e40af,stroke:#3b82f6,color:#ffffff
+    style VM1 fill:#6b7280,stroke:#9ca3af,color:#ffffff
+    style VM10 fill:#7c3aed,stroke:#8b5cf6,color:#ffffff
+    style VM20 fill:#059669,stroke:#10b981,color:#ffffff
+    style VM30 fill:#d97706,stroke:#f59e0b,color:#ffffff
+```
 
 ---
 
@@ -111,6 +141,7 @@ Die Infrastruktur verwendet VLAN-basierte Netzwerk-Segmentierung für optimale S
    - LLDP-MED: **aktiviert**
    - Spanning Tree Protocol: **aktiviert**
 
+---
 
 ## Proxmox Netzwerk-Setup
 
@@ -121,25 +152,29 @@ Die Infrastruktur verwendet VLAN-basierte Netzwerk-Segmentierung für optimale S
 apt update && apt upgrade -y
 
 # Erforderliche Pakete installieren
-apt install ufw git python3 python3-pip fail2ban sudo -y
+apt install ufw git python3 python3-pip fail2ban sudo bridge-utils -y
 
-# VLAN-Modul laden
+# VLAN-Support sicherstellen
 echo "8021q" > /etc/modules-load.d/vlan.conf
+modprobe 8021q
 lsmod | grep 8021q
 ```
 
-### Netzwerk-Interface Konfiguration
+### ⚡ **Moderne VLAN-aware Bridge Konfiguration**
 
 ```bash
-# Netzwerk-Konfiguration erstellen
+# Backup der Original-Konfiguration
+cp /etc/network/interfaces /etc/network/interfaces.backup.$(date +%Y%m%d_%H%M%S)
+
+# Moderne VLAN-aware Bridge Konfiguration
 cat > /etc/network/interfaces << 'EOF'
 auto lo
 iface lo inet loopback
 
-# Physisches Interface - Trunk Port
+# Physisches Interface - Trunk Port (keine IP)
 iface eno1 inet manual
 
-# Native VLAN Bridge (VLAN 1)
+# VLAN-aware Bridge - Enterprise Standard
 auto vmbr0
 iface vmbr0 inet static
         address 10.0.0.200/24
@@ -147,91 +182,67 @@ iface vmbr0 inet static
         bridge-ports eno1
         bridge-stp off
         bridge-fd 0
-
-# Management VLAN (VLAN 10)
-auto mgmt10
-iface mgmt10 inet manual
-        bridge-ports eno1.10
-        bridge-stp off
-        bridge-fd 0
-
-# Production VLAN (VLAN 20)
-auto prod20
-iface prod20 inet manual
-        bridge-ports eno1.20
-        bridge-stp off
-        bridge-fd 0
-
-# DMZ VLAN (VLAN 30)
-auto dmz30
-iface dmz30 inet manual
-        bridge-ports eno1.30
-        bridge-stp off
-        bridge-fd 0
+        bridge-vlan-aware yes
+        bridge-vids 10,20,30
 
 source /etc/network/interfaces.d/*
 EOF
 
-# Netzwerk-Konfiguration anwenden
+# Netzwerk-Konfiguration sofort anwenden
 systemctl restart networking
+
+# Netzwerk-Status prüfen
+ip addr show vmbr0
+bridge vlan show
 ```
 
-### Netzwerk-Bridge-Architektur
-```mermaid
-%%{init: {'theme':'dark','themeVariables':{'primaryColor':'#4f46e5','primaryTextColor':'#e5e7eb','primaryBorderColor':'#6b7280','lineColor':'#9ca3af','background':'#1f2937','secondaryColor':'#374151','tertiaryColor':'#111827'}}}%%
-graph TD
-    Physical[eno1<br/>Physisches Interface<br/>Trunk Port]
-    
-    subgraph "Bridge Konfiguration"
-        vmbr0[vmbr0<br/>Native Bridge<br/>10.0.0.200/24]
-        mgmt10[mgmt10<br/>Management Bridge<br/>VLAN 10]
-        prod20[prod20<br/>Production Bridge<br/>VLAN 20]
-        dmz30[dmz30<br/>DMZ Bridge<br/>VLAN 30]
-    end
-    
-    subgraph "VLAN Tagging"
-        Native[VLAN 1 - Untagged]
-        Tag10[VLAN 10 - Tagged]
-        Tag20[VLAN 20 - Tagged]
-        Tag30[VLAN 30 - Tagged]
-    end
-    
-    Physical --> vmbr0
-    Physical --> mgmt10
-    Physical --> prod20
-    Physical --> dmz30
-    
-    vmbr0 --> Native
-    mgmt10 --> Tag10
-    prod20 --> Tag20
-    dmz30 --> Tag30
-    
-    style Physical fill:#f59e0b,stroke:#fbbf24,color:#000000
-    style vmbr0 fill:#1e40af,stroke:#3b82f6,color:#ffffff
-    style mgmt10 fill:#7c3aed,stroke:#8b5cf6,color:#ffffff
-    style prod20 fill:#059669,stroke:#10b981,color:#ffffff
-    style dmz30 fill:#d97706,stroke:#f59e0b,color:#ffffff
-    style Native fill:#1e40af,stroke:#3b82f6,color:#ffffff
-    style Tag10 fill:#7c3aed,stroke:#8b5cf6,color:#ffffff
-    style Tag20 fill:#059669,stroke:#10b981,color:#ffffff
-    style Tag30 fill:#d97706,stroke:#f59e0b,color:#ffffff
-```
+# Netzwerk-Konfiguration erfolgreich abgeschlossen
+
+---
 
 ## Benutzer-Management
 
-### Linux-Benutzer erstellen
+### Root-Passwort sichern
+
+```bash
+# Starkes Root-Passwort setzen (für Notfälle)
+passwd root
+# Verwende ein starkes, eindeutiges Passwort und dokumentiere es sicher
+```
+
+### Linux-Benutzer erstellen mit Proxmox-Befehlen
 
 ```bash
 # Benutzer mit Home-Verzeichnis anlegen
 useradd -m -d /home/erik -s /bin/bash erik
 
-# Passwort setzen
+# Starkes Passwort setzen
 passwd erik
 
 # Sudo-Berechtigung gewähren
 usermod -aG sudo erik
+
+# WICHTIG: Sudo-Konfiguration für Proxmox-Befehle
+# Dies erlaubt erik, alle Befehle ohne Passwort auszuführen
 echo "erik ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/erik
 chmod 440 /etc/sudoers.d/erik
+
+# PATH für Proxmox-Tools erweitern (wichtig für qm, pveum, etc.)
+cat >> /home/erik/.bashrc << 'EOF'
+
+# Proxmox Tools im PATH
+export PATH=$PATH:/usr/sbin:/sbin
+
+# Nützliche Proxmox-Aliase
+alias vmlist='qm list'
+alias vmstart='sudo qm start'
+alias vmstop='sudo qm stop'
+alias vmstatus='sudo qm status'
+alias pveversion='sudo pveversion -v'
+EOF
+
+# Bashrc für erik neu laden
+su - erik -c "source ~/.bashrc"
 ```
 
 ### Proxmox PAM-Integration
@@ -240,13 +251,30 @@ chmod 440 /etc/sudoers.d/erik
 # Benutzer in Proxmox registrieren
 pveum user add erik@pam
 
-# (Optional) Proxmox-spezifisches Passwort setzen
-pveum passwd erik@pam
-
 # Administrator-Rechte gewähren
 pveum acl modify / -user erik@pam -role Administrator
 ```
 
+### 💡 **Lösung für Proxmox-Befehle ohne Root-Login**
+
+```bash
+# Als erik einloggen und testen
+su - erik
+
+# Jetzt funktionieren alle Proxmox-Befehle direkt:
+qm list                    # Zeigt alle VMs
+pveum user list           # Zeigt alle Benutzer
+pveversion -v             # Zeigt Proxmox-Version
+
+# Befehle die Root benötigen, automatisch mit sudo:
+sudo qm start 100         # Startet VM 100
+sudo systemctl status pveproxy  # Status des Proxmox-Dienstes
+
+# Logout von erik
+exit
+```
+
+---
 
 ## SSH-Konfiguration
 
@@ -282,6 +310,58 @@ $sshConfig | Out-File -FilePath "$env:USERPROFILE\.ssh\config" -Encoding UTF8
 ---
 
 ## Security Hardening
+
+### 🔐 System-Basis-Härtung
+
+#### 1. IPv6 deaktivieren (Angriffsfläche reduzieren)
+
+```bash
+# IPv6 systemweit deaktivieren
+echo 'net.ipv6.conf.all.disable_ipv6 = 1' | sudo tee -a /etc/sysctl.conf
+echo 'net.ipv6.conf.default.disable_ipv6 = 1' | sudo tee -a /etc/sysctl.conf
+echo 'net.ipv6.conf.lo.disable_ipv6 = 1' | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+
+# GRUB-Konfiguration aktualisieren
+sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="quiet"/GRUB_CMDLINE_LINUX_DEFAULT="quiet ipv6.disable=1"/' /etc/default/grub
+sudo update-grub
+```
+
+#### 2. Kernel-Parameter-Härtung
+
+```bash
+# Netzwerk-Sicherheit
+sudo tee -a /etc/sysctl.conf << 'EOF'
+
+# Network Security Hardening
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.conf.default.accept_redirects = 0
+net.ipv4.conf.all.secure_redirects = 0
+net.ipv4.conf.default.secure_redirects = 0
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv4.conf.default.accept_source_route = 0
+net.ipv4.conf.all.log_martians = 1
+net.ipv4.conf.default.log_martians = 1
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.icmp_ignore_bogus_error_responses = 1
+net.ipv4.tcp_syncookies = 1
+net.ipv4.ip_forward = 1
+
+# Memory Protection
+kernel.dmesg_restrict = 1
+kernel.kptr_restrict = 2
+kernel.yama.ptrace_scope = 1
+
+# File System Protection
+fs.protected_hardlinks = 1
+fs.protected_symlinks = 1
+fs.suid_dumpable = 0
+EOF
+
+sudo sysctl -p
+```
 
 ### 🔒 Enterprise SSH-Härtung (Security Level: 96/100)
 
@@ -458,41 +538,86 @@ sudo systemctl status sshd
 sudo ss -tlnp | grep :62222
 ```
 
+---
 
 ## Firewall & Monitoring
 
-### UFW Firewall-Konfiguration
+### 🛡️ UFW Firewall-Konfiguration
+
+#### 1. Grundkonfiguration
 
 ```bash
-# IPv6 systemweit deaktivieren
-echo 'net.ipv6.conf.all.disable_ipv6 = 1' | sudo tee -a /etc/sysctl.conf
-echo 'net.ipv6.conf.default.disable_ipv6 = 1' | sudo tee -a /etc/sysctl.conf
-echo 'net.ipv6.conf.lo.disable_ipv6 = 1' | sudo tee -a /etc/sysctl.conf
-sudo sysctl -p
-
-# GRUB-Konfiguration aktualisieren
-sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="quiet"/GRUB_CMDLINE_LINUX_DEFAULT="quiet ipv6.disable=1"/' /etc/default/grub
-sudo update-grub
-
-# UFW IPv6 deaktivieren
+# UFW IPv6 deaktivieren (bereits durch System-Härtung deaktiviert)
 sudo sed -i 's/IPV6=yes/IPV6=no/' /etc/default/ufw
 
-# Standard-Richtlinien
+# Standard-Richtlinien (Default Deny)
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
+sudo ufw default deny forward
+```
 
-# Service-Ports öffnen
-sudo ufw allow from 10.0.0.0/16 to any port 62222 proto tcp comment 'SSH Hardened from local network'
-sudo ufw allow from 10.0.0.0/16 to any port 8006 proto tcp comment 'Proxmox WebUI from local network'
+#### 2. Lokale Services (LAN-Zugriff)
+
+```bash
+# SSH (gehärtet) - Nur aus lokalem Netzwerk
+sudo ufw allow from 10.0.0.0/16 to any port 62222 proto tcp comment 'SSH Hardened - LAN only'
+
+# Proxmox WebUI - Nur aus lokalem Netzwerk
+sudo ufw allow from 10.0.0.0/16 to any port 8006 proto tcp comment 'Proxmox WebUI - LAN only'
+```
+
+#### 3. VM-Bridge-Traffic Regeln (Detaillierte Erklärung)
+
+```bash
+# ============================================================================
+# VM-BRIDGE TRAFFIC KONTROLLE
+# Diese Regeln erlauben eingehenden Traffic von VMs in verschiedenen VLANs
+# zur Bridge vmbr0. Dies ist notwendig, damit VMs untereinander und mit dem
+# Proxmox-Host kommunizieren können.
+# ============================================================================
+
+# Native VLAN (10.0.0.0/24) - Home/Management LAN
+# Erlaubt: VMs im Home-Netzwerk können mit dem Host kommunizieren
+sudo ufw allow in on vmbr0 from 10.0.0.0/24 comment 'Native VLAN - Erlaubt VM-zu-Host Kommunikation im Home-Netzwerk'
+
+# Management VLAN (10.10.0.0/24) - Verwaltungs-Netzwerk
+# Erlaubt: Management-VMs (z.B. Monitoring) können auf den Host zugreifen
+sudo ufw allow in on vmbr0 from 10.10.0.0/24 comment 'Management VLAN - Erlaubt Management-VM Zugriff auf Host'
+
+# Production VLAN (10.20.0.0/24) - Produktiv-Server
+# Erlaubt: Produktiv-VMs können untereinander kommunizieren (Bridge-Funktion)
+sudo ufw allow in on vmbr0 from 10.20.0.0/24 comment 'Production VLAN - Erlaubt Server-VM Traffic über Bridge'
+
+# DMZ VLAN (10.30.0.0/24) - Demilitarisierte Zone
+# Erlaubt: DMZ-VMs können nach außen kommunizieren (Internet), aber isoliert von anderen VLANs
+sudo ufw allow in on vmbr0 from 10.30.0.0/24 comment 'DMZ VLAN - Erlaubt isolierten DMZ-VM Traffic'
+
+# ============================================================================
+# WICHTIG: Diese Regeln erlauben NUR den Traffic VON den VMs ZUR Bridge.
+# Die tatsächliche Isolation zwischen VLANs wird durch UniFi-Firewall-Regeln
+# auf Router-Ebene gesteuert. Die UFW schützt primär den Proxmox-Host selbst.
+# ============================================================================
+```
+
+#### 4. Logging und Monitoring
+
+```bash
+# UFW Logging aktivieren
+sudo ufw logging on
 
 # Firewall aktivieren
 sudo ufw --force enable
+
+# Status anzeigen
+sudo ufw status verbose
+sudo ufw status numbered
 ```
 
-### Fail2Ban Konfiguration
+### 🚫 Fail2Ban Konfiguration
+
+#### 1. SSH-Schutz (Basis)
 
 ```bash
-# SSH-Basis-Schutz
 sudo tee /etc/fail2ban/jail.d/sshd-hardened.conf << 'EOF'
 [sshd]
 enabled = true
@@ -505,8 +630,11 @@ findtime = 600
 bantime = 3600
 ignoreip = 127.0.0.1/8 10.0.0.0/16
 EOF
+```
 
-# Aggressiver SSH-Schutz
+#### 2. SSH-Schutz (Aggressiv)
+
+```bash
 sudo tee /etc/fail2ban/jail.d/ssh-aggressive.conf << 'EOF'
 [sshd-aggressive]
 enabled = true
@@ -519,32 +647,228 @@ findtime = 60
 bantime = 600
 ignoreip = 127.0.0.1/8 10.0.0.0/16
 EOF
-
-# Fail2Ban aktivieren
-sudo systemctl restart fail2ban
 ```
 
-## 📊 Konfigurationsübersicht
+#### 3. Proxmox WebUI Schutz
 
-### Abgeschlossene Sicherheitsmaßnahmen
+```bash
+sudo tee /etc/fail2ban/jail.d/proxmox-web.conf << 'EOF'
+[proxmox-web]
+enabled = true
+port = 8006
+filter = proxmox-web
+logpath = /var/log/daemon.log
+backend = systemd
+maxretry = 5
+findtime = 300
+bantime = 1800
+ignoreip = 127.0.0.1/8 10.0.0.0/16
+
+[Definition]
+failregex = pvedaemon\[.*authentication failure.*rip=<HOST>
+EOF
+```
+
+#### 4. Fail2Ban aktivieren
+
+```bash
+# Service starten und aktivieren
+sudo systemctl enable fail2ban
+sudo systemctl restart fail2ban
+
+# Status prüfen
+sudo fail2ban-client status
+sudo fail2ban-client status sshd
+```
+
+---
+
+## 🌐 Netzwerk-Konfiguration
+
+### **Sicherheitsmaßnahmen**
 
 | Komponente | Status | Security Level |
 |------------|---------|----------------|
+| System-Basis-Härtung | ✅ Implementiert | Komplett |
 | SSH Hardening | ✅ Implementiert | 96/100 |
-| Firewall (UFW) | ✅ Konfiguriert | Enterprise |
-| Fail2Ban | ✅ Aktiv | Aggressiv |
-| VLAN Segmentierung | ✅ Implementiert | Production |
+| VLAN-aware Bridge | ✅ Modern | Enterprise |
+| UFW Firewall | ✅ Restriktiv | Defense-in-Depth |
+| Fail2Ban | ✅ Mehrstufig | Aggressiv |
 | IPv6 Deaktivierung | ✅ Systemweit | Komplett |
+| Root-Passwort | ✅ Gehärtet | Notfall-Zugang |
 | Key-only Authentication | ✅ Erzwungen | Obligatorisch |
 
-### Netzwerk-Ports
+### **Netzwerk-Ports & Services**
 
-| Service | Port | Zugriff | Protokoll |
-|---------|------|---------|-----------|
-| SSH (gehärtet) | 62222 | LAN only | TCP |
-| Proxmox WebUI | 8006 | LAN only | HTTPS |
-| Standard SSH | 22 | ❌ Deaktiviert | - |
+| Service | Port | Zugriff | Protokoll | Zweck |
+|---------|------|---------|-----------|--------|
+| SSH (gehärtet) | 62222 | LAN only | TCP | Sichere Administration |
+| Proxmox WebUI | 8006 | LAN only | HTTPS | Management Interface |
+| Standard SSH | 22 | ❌ Deaktiviert | - | Sicherheitsrisiko |
 
-**🎯 Das System ist jetzt produktionsreif und sicherer als die meisten Enterprise-Systeme!**
+---
 
-*Dokumentation erstellt am: $(date)*
+## ✅ **Finale Checkliste**
+
+- [ ] Proxmox Post-Install Skripts ausgeführt
+- [ ] UniFi Switch-Port als Trunk konfiguriert  
+- [ ] VLAN-aware Bridge `vmbr0` eingerichtet
+- [ ] `bridge vlan show` zeigt korrekte VLAN-Tags
+- [ ] Benutzer `erik` erstellt und konfiguriert
+- [ ] PATH für Proxmox-Tools erweitert
+- [ ] SSH gehärtet auf Port 62222
+- [ ] UFW Firewall aktiviert und konfiguriert
+- [ ] Fail2Ban für SSH-Schutz aktiv
+- [ ] Proxmox WebUI erreichbar (`https://10.0.0.200:8006`)
+- [ ] SSH-Verbindung funktioniert (`ssh erik@10.0.0.200 -p 62222`)
+- [ ] Proxmox-Befehle als erik ausführbar (`qm list`, `pveum user list`)
+
+---
+
+## 🎯 **Warum diese Konfiguration perfekt für Homeserver ist**
+
+### **Vorteile für Homeserver-Betrieb:**
+
+1. **Einfache Wartung**: Eine einzige VLAN-aware Bridge statt komplexer Multi-Bridge-Setups
+2. **Skalierbarkeit**: Neue VLANs können jederzeit ohne Neustart hinzugefügt werden
+3. **Performance**: Direkter Bridge-Traffic ohne zusätzliche Hops
+4. **Sicherheit**: Enterprise-Level Security ohne Overhead
+5. **Benutzerfreundlichkeit**: Erik kann alle Befehle ohne ständige Root-Logins ausführen
+
+### **Spezielle Homeserver-Optimierungen:**
+
+- **Keine unnötigen Cluster-Ports**: Reduzierte Angriffsfläche
+- **Vereinfachtes Benutzer-Management**: Ein Power-User (erik) mit vollen Rechten
+- **Praktische Aliase**: Schneller Zugriff auf häufige VM-Operationen
+- **Dokumentierte Firewall-Regeln**: Verständlich erklärt für einfache Anpassungen
+
+### **Tipps für den täglichen Betrieb:**
+
+```bash
+# Als erik eingeloggt - Häufige Befehle:
+
+# VM-Verwaltung
+vmlist                    # Alle VMs anzeigen
+vmstart 100              # VM 100 starten
+vmstop 100               # VM 100 stoppen
+vmstatus 100             # Status von VM 100
+
+# Proxmox-Status
+pveversion               # Version anzeigen
+sudo pvecm status        # Cluster-Status (auch als Standalone)
+sudo systemctl status pveproxy  # WebUI-Status
+
+# Netzwerk-Debugging
+ip addr show vmbr0       # Bridge-Status
+bridge vlan show         # VLAN-Konfiguration
+sudo ufw status numbered # Firewall-Regeln
+
+# Logs prüfen
+sudo journalctl -xe      # System-Logs
+sudo fail2ban-client status sshd  # SSH-Angriffe
+```
+
+**🏠 Das System ist jetzt optimal für deinen Homeserver konfiguriert mit professioneller Sicherheit und einfacher Bedienung!**
+
+*Dokumentation erstellt am: $(date)*Proxmox VLAN-Setup**
+
+Nach dem erfolgreichen Setup der VLAN-aware Bridge sind noch wenige Konfigurationsschritte in der Proxmox WebUI erforderlich.
+
+#### **Proxmox WebUI: VM-Netzwerk-Zuordnung**
+
+**Zugriff:** `https://10.0.0.200:8006`
+
+Für neue VMs die Netzwerk-Konfiguration folgendermaßen vornehmen:
+
+| VLAN | Zweck | Bridge | VLAN Tag | Netzwerk |
+|------|-------|--------|----------|----------|
+| Native | Home/Management | `vmbr0` | `leer` | 10.0.0.0/24 |
+| 10 | Management | `vmbr0` | `10` | 10.10.0.0/24 |
+| 20 | Production | `vmbr0` | `20` | 10.20.0.0/24 |
+| 30 | DMZ | `vmbr0` | `30` | 10.30.0.0/24 |
+
+**VM-Netzwerk-Einstellungen:**
+- **Model:** `VirtIO (paravirtualized)` (beste Performance)
+- **Bridge:** Immer `vmbr0`
+- **VLAN Tag:** Je nach gewünschtem Netzwerk-Segment
+
+#### **CLI-basierte VM-Netzwerk-Konfiguration**
+
+```bash
+# Bestehende VMs auf VLANs verteilen
+qm set 100 -net0 virtio,bridge=vmbr0,tag=10  # Management VLAN
+qm set 101 -net0 virtio,bridge=vmbr0,tag=20  # Production VLAN
+qm set 102 -net0 virtio,bridge=vmbr0,tag=30  # DMZ VLAN
+qm set 103 -net0 virtio,bridge=vmbr0         # Native VLAN (ohne Tag)
+
+# Neue VM mit mehreren Netzwerk-Interfaces
+qm set 104 -net0 virtio,bridge=vmbr0,tag=20 -net1 virtio,bridge=vmbr0,tag=10
+```
+
+### **UniFi Switch-Konfiguration verifizieren**
+
+**Navigation:** UniFi Controller → Devices → [Switch] → Ports
+
+**Proxmox Port-Konfiguration prüfen:**
+- **Port Profile:** `Proxmox-Trunk`
+- **Port Type:** `Trunk`
+- **Native VLAN:** `1 (Home)`
+- **Tagged VLANs:** `10, 20, 30`
+- **Storm Control:** ✅ Aktiviert
+- **Spanning Tree:** ✅ Aktiviert
+
+---
+
+## 🔍 **Konfiguration verifizieren**
+
+```bash
+# Bridge-Status anzeigen
+brctl show
+
+# VLAN-Konfiguration prüfen
+bridge vlan show
+
+# Netzwerk-Status
+ip addr show vmbr0
+ip route show
+
+# Netzwerk-Tests
+ping -c 3 10.0.0.1    # Gateway erreichbar
+ping -c 3 8.8.8.8     # Internet erreichbar
+```
+
+### **Erwartete Ausgabe:**
+
+```bash
+# brctl show sollte zeigen:
+bridge name     bridge id               STP enabled     interfaces
+vmbr0           8000.xxxxxxxxxxxx       no              eno1
+
+# bridge vlan show sollte zeigen:
+port              vlan-id
+eno1              1 PVID Egress Untagged
+                 10
+                 20  
+                 30
+vmbr0             1 PVID Egress Untagged
+                 10
+                 20
+                 30
+```
+
+---
+
+## 📊 **Optimierte Konfigurationsübersicht**
+
+### **Architektur-Verbesserungen**
+
+| Aspekt | Alte Konfiguration | ✅ Neue Optimierung |
+|--------|-------------------|---------------------|
+| Bridge-Typ | Separate VLANs + Sub-Interfaces | VLAN-aware Bridge |
+| Komplexität | Hoch (mehrere Bridges) | Niedrig (eine Bridge) |
+| Performance | Mehrere Network Hops | Optimiert, direkt |
+| Wartung | Komplex, fehleranfällig | Einfach, robust |
+| Persistenz | Zusätzliche Services | Native Linux Networking |
+| Enterprise Standard | ❌ Veraltet | ✅ Modern |
+
+### **
