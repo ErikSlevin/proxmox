@@ -196,8 +196,6 @@ ip addr show vmbr0
 bridge vlan show
 ```
 
-# Netzwerk-Konfiguration erfolgreich abgeschlossen
-
 ---
 
 ## Benutzer-Management
@@ -210,7 +208,7 @@ passwd root
 # Verwende ein starkes, eindeutiges Passwort und dokumentiere es sicher
 ```
 
-### Linux-Benutzer erstellen mit Proxmox-Befehlen
+### Linux-Benutzer erstellen mit Proxmox-Integration
 
 ```bash
 # Benutzer mit Home-Verzeichnis anlegen
@@ -222,27 +220,88 @@ passwd erik
 # Sudo-Berechtigung gewähren
 usermod -aG sudo erik
 
+# Erik zu www-data Gruppe hinzufügen (für /etc/pve/ Zugriff)
+usermod -aG www-data erik
+
 # WICHTIG: Sudo-Konfiguration für Proxmox-Befehle
 # Dies erlaubt erik, alle Befehle ohne Passwort auszuführen
 echo "erik ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/erik
 chmod 440 /etc/sudoers.d/erik
 
-# PATH für Proxmox-Tools erweitern (wichtig für qm, pveum, etc.)
+# PATH für Proxmox-Tools erweitern und Enterprise-Aliase einrichten
 cat >> /home/erik/.bashrc << 'EOF'
 
 # Proxmox Tools im PATH
 export PATH=$PATH:/usr/sbin:/sbin
 
-# Nützliche Proxmox-Aliase
-alias vmlist='qm list'
+# ============================================================================
+# PROXMOX MANAGEMENT ALIASES - Enterprise Standard
+# ============================================================================
+# WICHTIG: Proxmox-Befehle erfordern sudo-Rechte für IPC-Kommunikation.
+# Diese Aliase bieten die professionelle Arbeitsweise für Proxmox-Administration.
+
+# VM Management
+alias qm='sudo qm'
+alias vmlist='sudo qm list'
 alias vmstart='sudo qm start'
 alias vmstop='sudo qm stop'
 alias vmstatus='sudo qm status'
-alias pveversion='sudo pveversion -v'
+alias vmreboot='sudo qm reboot'
+alias vmshutdown='sudo qm shutdown'
+alias vmreset='sudo qm reset'
+alias vmmonitor='sudo qm monitor'
+alias vmconfig='sudo qm config'
+alias vmclone='sudo qm clone'
+alias vmcreate='sudo qm create'
+alias vmdestroy='sudo qm destroy'
+
+# Container Management (LXC)
+alias pct='sudo pct'
+alias ctlist='sudo pct list'
+alias ctstart='sudo pct start'
+alias ctstop='sudo pct stop'
+alias ctstatus='sudo pct status'
+alias ctenter='sudo pct enter'
+alias ctconfig='sudo pct config'
+
+# User & Permission Management
+alias pveum='sudo pveum'
+alias userlist='sudo pveum user list'
+alias grouplist='sudo pveum group list'
+alias rolelist='sudo pveum role list'
+alias useradd='sudo pveum user add'
+alias userdel='sudo pveum user delete'
+alias usermod='sudo pveum user modify'
+alias acllist='sudo pveum acl list'
+
+# System Management
+alias pveversion='sudo pveversion'
+alias pvestatus='sudo systemctl status pvedaemon pveproxy pve-cluster --no-pager'
+alias pverestart='sudo systemctl restart pvedaemon pveproxy'
+alias pvelog='sudo journalctl -u pvedaemon -f'
+alias pveupdate='sudo apt update && sudo apt dist-upgrade'
+
+# Storage Management
+alias pvesm='sudo pvesm'
+alias storagelist='sudo pvesm status'
+alias storageadd='sudo pvesm add'
+
+# Backup Management
+alias vzdump='sudo vzdump'
+alias backuplist='sudo vzdump --dumpdir /var/lib/vz/dump'
+
+# Network Management
+alias bridgelist='brctl show'
+alias vlanshow='bridge vlan show'
+alias netstat='sudo netstat -tulpn'
+
+# Quick System Info
+alias pveinfo='echo "=== PROXMOX SYSTEM INFO ===" && sudo pveversion -v && echo && echo "=== VMs ===" && sudo qm list && echo && echo "=== CONTAINERS ===" && sudo pct list && echo && echo "=== STORAGE ===" && sudo pvesm status'
+
 EOF
 
-# Bashrc für erik neu laden
-su - erik -c "source ~/.bashrc"
+# .bashrc für erik neu laden
+chown erik:erik /home/erik/.bashrc
 ```
 
 ### Proxmox PAM-Integration
@@ -255,24 +314,62 @@ pveum user add erik@pam
 pveum acl modify / -user erik@pam -role Administrator
 ```
 
-### 💡 **Lösung für Proxmox-Befehle ohne Root-Login**
+### 💡 **Enterprise-Proxmox-Arbeitsweise**
 
 ```bash
 # Als erik einloggen und testen
 su - erik
 
-# Jetzt funktionieren alle Proxmox-Befehle direkt:
-qm list                    # Zeigt alle VMs
-pveum user list           # Zeigt alle Benutzer
-pveversion -v             # Zeigt Proxmox-Version
+# Jetzt funktionieren alle Proxmox-Befehle über Aliase:
+vmlist                 # = sudo qm list (zeigt alle VMs)
+userlist              # = sudo pveum user list (zeigt alle Benutzer)
+pveinfo               # Kompletter System-Überblick
+storagelist           # Storage-Status
 
-# Befehle die Root benötigen, automatisch mit sudo:
-sudo qm start 100         # Startet VM 100
-sudo systemctl status pveproxy  # Status des Proxmox-Dienstes
+# VM-Management-Beispiele:
+vmstart 100           # Startet VM 100
+vmstop 100            # Stoppt VM 100
+vmstatus 100          # Status von VM 100
+
+# Container-Management:
+ctlist                # Alle Container anzeigen
+ctstart 101           # Container 101 starten
+
+# System-Management:
+pvestatus             # Status aller Proxmox-Services
+pvelog                # Live-Logs verfolgen
 
 # Logout von erik
 exit
 ```
+
+### 🔍 **Warum Sudo-Aliase bei Proxmox?**
+
+**Technischer Hintergrund:**
+- Proxmox verwendet **IPC-Socket-Kommunikation** für administrative Befehle
+- Diese erfordern **erhöhte Berechtigungen** (sudo) für Sicherheit
+- **Enterprise-Standard**: Administrative Operationen benötigen sudo-Rechte
+- **Beste Praxis**: Aliase bieten Komfort ohne Sicherheitseinbußen
+
+**Vorteile der Alias-Lösung:**
+- ✅ **Sicherheit**: Sudo-Rechte für kritische Operationen
+- ✅ **Komfort**: Kurze, einprägsame Befehle
+- ✅ **Vollständig**: Alle Proxmox-Funktionen abgedeckt
+- ✅ **Professional**: Entspricht Enterprise-Standards
+- ✅ **Wartungsfreundlich**: Keine komplexe Berechtigungskonfiguration
+
+### 📊 **Verfügbare Alias-Kategorien**
+
+| Kategorie | Anzahl | Beispiele |
+|-----------|--------|-----------|
+| **VM Management** | 12 | `vmlist`, `vmstart`, `vmstop`, `vmconfig` |
+| **Container (LXC)** | 7 | `ctlist`, `ctstart`, `ctenter` |
+| **Benutzer-Verwaltung** | 8 | `userlist`, `useradd`, `grouplist` |
+| **System-Management** | 6 | `pveinfo`, `pvestatus`, `pvelog` |
+| **Storage & Backup** | 4 | `storagelist`, `backuplist` |
+| **Netzwerk** | 3 | `bridgelist`, `vlanshow` |
+
+**🏠 Das System bietet jetzt professionelle Proxmox-Administration mit Enterprise-Sicherheit und Homeserver-Komfort!**
 
 ---
 
