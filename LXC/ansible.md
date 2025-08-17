@@ -242,3 +242,108 @@ ss -tlnp | grep :62222
 apt install sudo -y
 
 su - erik 
+
+### quelle
+https://www.youtube.com/watch?v=CltoVfeRdoM&list=PLjxLL_QG98bjlTySo8kACJGuHks2pT5KQ
+
+sudo adduser --system  --group --home /home/semaphore semaphore
+sudo apt update -y
+sudo apt install mariadb-server -y
+systemctl status mariadb
+sudo mysql_secure_installation
+
+ sudo mariadb
+ CREATE DATABASE semaphore_db;
+ SHOW DATABASES;
+ GRANT ALL PRIVILEGES ON semaphore_db.* TO semaphore_user@localhost IDENTIFIED BY "BY!og^0g#953%h4^CX6tbBp*";
+FLUSH PRIVILEGES;
+EXIT
+
+wget https://github.com/semaphoreui/semaphore/releases/download/v2.16.16/semaphore_2.16.16_linux_amd64.deb
+
+sudo apt install ./semaphore_2.16.16_linux_amd64.deb
+semaphore setup
+
+What database to use:
+   1 - MySQL
+   2 - BoltDB (DEPRECATED!!!)
+   3 - PostgreSQL
+   4 - SQLite
+ (default 1): 1
+
+db Hostname (default 127.0.0.1:3306): 
+db User (default root): semaphore_user
+db Password: BYXXXXXXXXXXXXXXXXXXXXXXXXXXXbBp*
+db Name (default semaphore): semaphore_db
+Playbook path (default /tmp/semaphore): Enter
+Public URL (optional, example: https://example.com/semaphore): Enter
+Enable email alerts? (yes/no) (default no): Enter
+Enable telegram alerts? (yes/no) (default no): Enter
+Enable slack alerts? (yes/no) (default no): Enter
+Enable Rocket.Chat alerts? (yes/no) (default no): Enter
+Enable Microsoft Team Channel alerts? (yes/no) (default no): Enter
+Enable LDAP authentication? (yes/no) (default no):Enter
+
+> Username: erik
+ > Email: erikxxxxxxxxxxxxxxx@outlook.de
+   WARN[0160] no rows in result set fields.level=Warn
+ > Your name: Erik
+ > Password: BYXXXXXXXXXXXXXXXXXXXXXXXXXXXbBp*
+
+ You are all setup Erik!
+
+ rm *_linux_amd64.deb -v
+ sudo chown semaphore:semaphore config.json
+ sudo mkdir /etc/semaphore -v
+ sudo chown semaphore:semaphore /etc/semaphore -v
+ sudo mv ./config.json /etc/semaphore/
+
+
+
+
+
+sudo apt install ansible -y
+ip a -> IP Adresse notieren
+semaphore server --config /etc/semaphore/config.json
+
+GUI testen: http://10.10.0.2:3000/
+- anmelden & testen - kein Projekt erstellen
+
+sudo nano /etc/systemd/system/semaphore.service
+
+[Unit]
+Description=Ansible Semaphore
+Documentation=https://docs.ansible-semaphore.com/
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/usr/bin/semaphore
+ConditionPathExists=/etc/semaphore/config.json
+
+[Service]
+ExecStart=/usr/bin/semaphore server --config /etc/semaphore/config.json
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10s
+User=semaphore
+Group=semaphore
+
+[Install]
+WantedBy=multi-user.target
+
+sudo systemctl daemon-reload 
+erik@ansible:~$ systemctl status semaphore.service 
+○ semaphore.service - Ansible Semaphore
+     Loaded: loaded (/etc/systemd/system/semaphore.service; disabled; p>     Active: inactive (dead)
+       Docs: https://docs.ansible-semaphore.com/
+
+erik@ansible:~$ sudo systemctl enable semaphore.service 
+Created symlink /etc/systemd/system/multi-user.target.wants/semaphore.service → /etc/systemd/system/semaphore.service.
+erik@ansible:~$ 
+
+erik@ansible:~$ systemctl status semaphore.service 
+○ semaphore.service - Ansible Semaphore
+     Loaded: loaded (/etc/systemd/system/semaphore.service; enabled; pr>     Active: inactive (dead)
+       Docs: https://docs.ansible-semaphore.com/
+
+sudo systemctl start semaphore.service
+sudo systemctl status semaphore.service
